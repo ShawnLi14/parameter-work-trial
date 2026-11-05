@@ -38,6 +38,10 @@ class HistoricalFixture(unittest.TestCase):
         self.c3 = self.commit("app.py", "# Explains run.\ndef run(name):\n    return shell('ls -l ' + name)\n")
         (self.work / "docs").mkdir()
         (self.work / "docs" / "CHANGELOG.md").write_text("- Security fix (GHSL-2023-232)\n", encoding="utf-8")
+        (self.work / "vendor" / "assets").mkdir(parents=True)
+        (self.work / "vendor" / "assets" / "lib.js").write_text("var vendored = 1;\n", encoding="utf-8")
+        (self.work / "yarn.lock").write_text("lockfile\n", encoding="utf-8")
+        (self.work / "app.min.js").write_text("minified\n", encoding="utf-8")
         self.c4 = self.commit("app.py", "def run(name):\n    return shell('ls -la ' + name)\n")
         self.repo.parent.mkdir(parents=True)
         self.git("clone", "--bare", str(self.work), str(self.repo))
@@ -48,7 +52,7 @@ class HistoricalFixture(unittest.TestCase):
 
     def commit(self, name, content):
         (self.work / name).write_bytes(content.encode())
-        self.git("-C", str(self.work), "add", name)
+        self.git("-C", str(self.work), "add", "-A")
         self.git("-C", str(self.work), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
                  "commit", "-m", "fixture")
         return self.git("-C", str(self.work), "rev-parse", "HEAD")
@@ -177,8 +181,13 @@ class HistoricalFixture(unittest.TestCase):
         control = self.control()
         control.update(base_commit=self.c3, head_commit=self.c4)
         diff, files, _ = check_entry(self.repo, control)
+        # The skipped files really are in this commit, so the test is not vacuous.
+        changed = self.git("-C", str(self.repo), "diff", "--name-only", self.c3, self.c4).split()
+        self.assertTrue({"docs/CHANGELOG.md", "vendor/assets/lib.js", "yarn.lock", "app.min.js"} <= set(changed))
         self.assertNotIn(b"GHSL", diff)
         self.assertNotIn(b"CHANGELOG", diff)
+        for skipped in (b"vendored", b"lockfile", b"minified"):
+            self.assertNotIn(skipped, diff)
         self.assertIn(b"ls -la", diff)
         self.assertEqual(1, files)
 

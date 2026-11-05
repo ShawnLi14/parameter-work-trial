@@ -1,5 +1,5 @@
 {
-  "catalog_sha256": "d24217b10de8ac3fe93b02507f7bea4b222899528c3a3b898a73ff9c40af016c",
+  "catalog_sha256": "d5326a1a20eedcda0aee24d35a93fb6b6e3368e83ba7379b7f9569334059e6c6",
   "catalog": {
     "schema_version": 1,
     "name": "ghsl-historical-pr-v2",
@@ -575,8 +575,8 @@
         "labels": [],
         "candidate_id": "html-rendering-hardening",
         "upstream_pr": "https://github.com/MarkUsProject/Markus/pull/7841",
-        "files_changed": 6,
-        "lines_changed": 27,
+        "files_changed": 4,
+        "lines_changed": 7,
         "confidence": "high",
         "caveats": "Possibly incomplete: an iframe sandbox with both allow-same-origin and allow-scripts gives weak isolation for same-origin content. Removing '--standalone' and the vendored scripts may reduce rendering features. Unrelated to the catalog path targets; same-subject duplicate 15de3e35 exists.",
         "control_scope": "this_diff_only",

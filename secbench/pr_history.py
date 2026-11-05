@@ -17,11 +17,16 @@ CONSTRUCTION = {"introduced_historical": "historical_commit_pair", "fix_reverted
                 "security_fix": "historical_commit_pair", "benign_nearby": "historical_commit_pair",
                 "preexisting_touch": "historical_commit_pair"}
 MAX_FILES, MAX_LINES = 70, 7000
-GENERATED = re.compile(r"(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Gemfile\.lock|poetry\.lock|[^/]*\.min\.(js|css)|[^/]*\.snap)$")
 COMMENT = re.compile(r"^(#|//|/\*|\*|<!--|--)")
 # Changelogs name the advisory a fix addresses, which would hand a reviewer the answer;
 # a reversed fix would even show the entry being deleted. They are left out of every diff.
 HIDDEN = (":(exclude,glob,icase)**/changelog*",)
+# Vendored libraries, lockfiles, and minified or snapshot files are not reviewable code; a
+# single vendored library can be megabytes. They are left out of diffs and size counts.
+NOT_REVIEWED = HIDDEN + tuple(f":(exclude,glob)**/{pattern}" for pattern in (
+    "vendor/**", "node_modules/**", "third_party/**", "bower_components/**",
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Gemfile.lock", "poetry.lock",
+    "*.min.js", "*.min.css", "*.snap"))
 
 
 def opaque_order(entries):
@@ -42,10 +47,8 @@ def changed_code_lines(diff):
 
 def diff_stats(repo, base, head):
     files, lines = 0, 0
-    for row in git("-C", repo, "diff", "--numstat", "--no-renames", base, head, "--", ".", *HIDDEN).decode("utf-8", "replace").splitlines():
+    for row in git("-C", repo, "diff", "--numstat", "--no-renames", base, head, "--", ".", *NOT_REVIEWED).decode("utf-8", "replace").splitlines():
         added, deleted, path = row.split("\t", 2)
-        if GENERATED.search(path):
-            continue
         files += 1
         if added != "-":
             lines += int(added) + int(deleted)
@@ -69,7 +72,7 @@ def check_entry(repo, entry):
     child, parent = (base, head) if entry["kind"] == "fix_reverted" else (head, base)
     if git("-C", repo, "rev-parse", child + "^1").decode().strip() != parent:
         raise ValueError(f"{name}: {parent} is not the first parent of {child}")
-    diff = git("-C", repo, "diff", "--no-color", "--no-ext-diff", "--no-renames", base, head, "--", ".", *HIDDEN)
+    diff = git("-C", repo, "diff", "--no-color", "--no-ext-diff", "--no-renames", base, head, "--", ".", *NOT_REVIEWED)
     files, lines = diff_stats(repo, base, head)
     if not 0 < files <= MAX_FILES or lines > MAX_LINES:
         raise ValueError(f"{name}: diff out of bounds ({files} files, {lines} lines)")

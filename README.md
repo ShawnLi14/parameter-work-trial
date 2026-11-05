@@ -54,7 +54,8 @@ A full pass over all 67 cases with it takes about 12 seconds.
 
 Each request contains `task_id`, `mode: "pr"`, `instructions`, the unified `diff`,
 and a `lookup` command. It never contains labels, case types, commit IDs, or commit
-messages. Changelog files are left out of diffs, because they name the advisory.
+messages. Changelog files are left out of diffs, because they name the advisory, as
+are vendored libraries, lockfiles, and minified files, which are not reviewable code.
 
 To read surrounding code, append an action to `lookup.command`; results are JSON:
 

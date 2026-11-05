@@ -119,6 +119,36 @@ once nothing is unresolved, the control alarm rate, and all of these by case typ
 in `by_variant`. While grading is incomplete, recall is a lower bound and precision
 is null. Scores describe these 37 targets, not every vulnerability in the projects.
 
+### Automatic grading with Jev
+
+`judge` drafts the grades file with TypeSafe AI's Jev, a decision model that picks
+from named options and reports probabilities but writes no text. Set `JEV_API_KEY`
+in `.env`, then grade and score as usual:
+
+```powershell
+python -m secbench judge --results .bench/run.json --out .bench/grades.json
+python -m secbench score --results .bench/run.json --grades .bench/grades.json --out .bench/score.json
+```
+
+For each finding, Jev sees the finding, the diff for the cited file, and numbered
+code around the cited line. It chooses between the case's targets, its `also_valid`
+issues, a false alarm, or another plausible issue, and separately judges whether the
+code supports the claim. It never sees commit IDs or the API key. A finding whose
+file exists on neither side is a false positive without a call. A confident,
+supported target choice is a `match` (extra matches of one target become
+`duplicate`), a confident `also_valid` choice is accepted, and a confident false
+alarm is a `false_positive`. Everything else, including other plausible issues,
+stays `unresolved` for a person, so precision and F1 stay unset until it is settled.
+
+Each decision's rationale records Jev's choice and confidence, its full answer is
+kept under `judge`, and `adjudicator` names the exact Jev version and threshold, so
+automatic grades are never mistaken for human ones. Grading costs a small fraction
+of a cent per run. **The default threshold (0.7) is not calibrated.** Hand-grade a
+sample of findings, compare, and report that agreement alongside any Jev-graded
+score. Jev's own docs say its confidence is calibrated across groups of answers, not
+for any single one. The account exposes only `jev-latest`, which changes with
+releases, so compare runs only when they were graded by the same Jev version.
+
 Results record the catalog's SHA-256 and grades record the results' SHA-256, so a
 label change after a run cannot be scored silently. Changing labels means a new
 catalog version and regrading.

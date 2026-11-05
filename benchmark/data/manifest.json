@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "name": "ghsl-historical-pr-v2",
+  "name": "ghsl-historical-prs",
   "label_provenance": "Targets from Security Lab reports. Commit pairs are real upstream history, mined and refuted by separate AI agents reading source. No human review and no exploit execution.",
   "limitations": [
     "Labels rest on source reading by AI agents; nothing was executed and no human reviewed them.",
@@ -544,7 +544,7 @@
         "GHSL-2023-247": "A crafted URL controls req.params.id on GET /api/v1/chatflows-streaming/:id -> at head the param.escape() validator is gone -> an unknown id reaches res.status(404).send() unencoded -> Express sends the string as text/html by default, so markup in the id renders in the victim browser. The route is whitelisted from basic auth. At base the sink receives the HTML-escaped decoded value, so neither single nor double encoding gets markup through.",
         "GHSL-2023-248": "A crafted URL controls req.params.id on GET /api/v1/credentials/:id -> at head the param.escape() validator is gone -> an unknown id reaches res.status(404).send() unencoded -> Express sends the string as text/html by default, so markup in the id renders in the victim browser. Requires the default no-auth configuration; gated when basic auth is set. At base the sink receives the HTML-escaped decoded value, so neither single nor double encoding gets markup through."
       },
-      "caveats": "Replaces xss-sanitizer-removed. Base is a branch commit of the #1327 branch (ancestor of main, not of flowise@1.4.3); head is its first parent, so the first-parent rule in secbench/pr_history.py holds, and the reviewer sees the reversed diff. e67c4315 later dropped these validators for the middleware, which is why the merged #1327 pair is weaker. Not run: that .escape() writes back to req.params is express-validator behaviour known from its documentation, not from code in this repo (the package is not vendored). The diff is noisy: most of its 421 lines remove validator boilerplate across many routes. Reversal also removes the fileName checks (GHSL-2023-232, base lines 1106-1111) and the escape on GHSL-2023-246's route (base line 350); a grader must accept both as correct findings here. The forward direction is not offered as a control because of validator typos such as param('chatId') on /:id routes (base lines 521, 531).",
+      "caveats": "Replaces xss-sanitizer-removed. Base is a branch commit of the #1327 branch (ancestor of main, not of flowise@1.4.3); head is its first parent, so the first-parent rule in benchmark/pr_history.py holds, and the reviewer sees the reversed diff. e67c4315 later dropped these validators for the middleware, which is why the merged #1327 pair is weaker. Not run: that .escape() writes back to req.params is express-validator behaviour known from its documentation, not from code in this repo (the package is not vendored). The diff is noisy: most of its 421 lines remove validator boilerplate across many routes. Reversal also removes the fileName checks (GHSL-2023-232, base lines 1106-1111) and the escape on GHSL-2023-246's route (base line 350); a grader must accept both as correct findings here. The forward direction is not offered as a control because of validator typos such as param('chatId') on /:id routes (base lines 521, 531).",
       "evidence": [
         {
           "label_id": "GHSL-2023-245",
@@ -1964,10 +1964,10 @@
       "review": {
         "verdict": "confirmed",
         "per_target": {
-          "GHSL-2024-060": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
-          "GHSL-2024-063": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
-          "GHSL-2024-064": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
-          "GHSL-2024-068": "Withheld pending private disclosure; see .bench/private/pr-v2-review."
+          "GHSL-2024-060": "Withheld pending private disclosure; see .bench/private/review-notes.",
+          "GHSL-2024-063": "Withheld pending private disclosure; see .bench/private/review-notes.",
+          "GHSL-2024-064": "Withheld pending private disclosure; see .bench/private/review-notes.",
+          "GHSL-2024-068": "Withheld pending private disclosure; see .bench/private/review-notes."
         },
         "method": "code reading by a separate agent; nothing executed"
       }
@@ -2018,7 +2018,7 @@
       "upstream_pr": "https://github.com/MarkUsProject/Markus/pull/8066",
       "confidence": "medium",
       "mechanism_at_commit": null,
-      "caveats": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+      "caveats": "Withheld pending private disclosure; see .bench/private/review-notes.",
       "evidence": [
         {
           "commit": "f04856f6c8f7caed102c52c635c69c07796e7411",
@@ -2061,10 +2061,10 @@
       "upstream_pr": "https://github.com/MarkUsProject/Markus/pull/7033",
       "confidence": "high",
       "mechanism_at_commit": null,
-      "caveats": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+      "caveats": "Withheld pending private disclosure; see .bench/private/review-notes.",
       "evidence": [],
       "absence_claims": [],
-      "why_no_new_vulnerability": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+      "why_no_new_vulnerability": "Withheld pending private disclosure; see .bench/private/review-notes.",
       "also_valid": [],
       "review": {
         "verdict": "confirmed",
@@ -3453,7 +3453,7 @@
         },
         {
           "label_id": null,
-          "description": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+          "description": "Withheld pending private disclosure; see .bench/private/review-notes.",
           "evidence": "tools/uvr5/vr.py:148, :189, :325, :362 at 6b7a98038fe1"
         },
         {

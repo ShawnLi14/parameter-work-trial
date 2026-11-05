@@ -29,9 +29,14 @@ NOT_REVIEWED = HIDDEN + tuple(f":(exclude,glob)**/{pattern}" for pattern in (
     "*.min.js", "*.min.css", "*.snap"))
 
 
+# Fixed salt for case numbering. Its value is historical; changing it renumbers every
+# case, which would invalidate existing runs and grades.
+ORDER_SALT = "pr-v2"
+
+
 def opaque_order(entries):
     """Order by content hash so case numbering reveals nothing about the variant."""
-    return sorted(entries, key=lambda e: hashlib.sha256(f"pr-v2|{e['base_commit']}|{e['head_commit']}".encode()).hexdigest())
+    return sorted(entries, key=lambda e: hashlib.sha256(f"{ORDER_SALT}|{e['base_commit']}|{e['head_commit']}".encode()).hexdigest())
 
 
 def changed_code_lines(diff):
@@ -132,7 +137,7 @@ def build(data, manifest, cache, destination, check_only=False):
         diff, files, lines = check_entry(repo, entry)
         # Fetched commits have no reference by default, so Git's cleanup could delete them.
         for commit in (entry["base_commit"], entry["head_commit"]):
-            git("-C", repo, "update-ref", f"refs/secbench/{commit}", commit)
+            git("-C", repo, "update-ref", f"refs/benchmark/{commit}", commit)
         case = {"id": f"h{index:03}", "repository": source["repository"], "ref": entry["head_commit"],
                 "base_ref": entry["base_commit"], "mode": "pr", "split": source["split"],
                 "leakage_group": source["leakage_group"], "validation": "source_reviewed",

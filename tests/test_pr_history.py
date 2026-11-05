@@ -7,11 +7,11 @@ import tempfile
 import unittest
 from unittest import mock
 
-from secbench import pr_history
-from secbench.catalog import digest, load
-from secbench.pr_history import build, changed_code_lines, check_entry, coverage, load_manifest
-from secbench.runner import case_trees, checked_lock, run, task
-from secbench.scoring import grade_template, score
+from benchmark import pr_history
+from benchmark.catalog import digest, load
+from benchmark.pr_history import build, changed_code_lines, check_entry, coverage, load_manifest
+from benchmark.runner import case_trees, checked_lock, run, task
+from benchmark.scoring import grade_template, score
 
 ROOT = Path(__file__).resolve().parents[1]
 LABEL = "GHSL-2023-232"
@@ -218,7 +218,7 @@ class HistoricalFixture(unittest.TestCase):
         self.assertFalse((destination / "sources").exists())
         self.assertFalse((destination / "bases").exists())
         # Commits stay referenced, so Git's cleanup cannot delete them from the store.
-        self.git("-C", str(self.repo), "rev-parse", "--verify", f"refs/secbench/{self.c1}")
+        self.git("-C", str(self.repo), "rev-parse", "--verify", f"refs/benchmark/{self.c1}")
         # Trees keep upstream bytes despite autocrlf=true on this "host".
         lock = checked_lock(suite, positive, destination)
         with case_trees(lock):
@@ -238,7 +238,7 @@ class HistoricalFixture(unittest.TestCase):
             self.assertNotIn("source_dir", request)
             self.assertIn("lookup", request)
 
-        agent = ROOT / "examples" / "empty_agent.py"
+        agent = ROOT / "tests" / "empty_agent.py"
         results = run(suite, suite["cases"], destination, [sys.executable, str(agent)], "smoke", 20)
         self.assertEqual({c["ref"] for c in suite["cases"]}, {r["commit"] for r in results["cases"]})
         self.assertTrue(all(r["status"] == "ok" for r in results["cases"]))

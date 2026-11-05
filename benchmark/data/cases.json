@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "name": "ghsl-historical-pr-v2",
+  "name": "ghsl-historical-prs",
   "status": "historical_commit_pairs",
   "label_provenance": "Targets from Security Lab reports. Commit pairs are real upstream history, mined and refuted by separate AI agents reading source. No human review and no exploit execution.",
   "limitations": [
@@ -156,7 +156,7 @@
       "files_changed": 6,
       "lines_changed": 668,
       "confidence": "medium",
-      "caveats": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+      "caveats": "Withheld pending private disclosure; see .bench/private/review-notes.",
       "control_scope": "this_diff_only",
       "also_valid": []
     },
@@ -313,7 +313,7 @@
       "files_changed": 2,
       "lines_changed": 37,
       "confidence": "high",
-      "caveats": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+      "caveats": "Withheld pending private disclosure; see .bench/private/review-notes.",
       "control_scope": "this_diff_only",
       "also_valid": []
     },
@@ -1165,7 +1165,7 @@
         },
         {
           "label_id": null,
-          "description": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+          "description": "Withheld pending private disclosure; see .bench/private/review-notes.",
           "evidence": "tools/uvr5/vr.py:148, :189, :325, :362 at 6b7a98038fe1",
           "id": "av2"
         },
@@ -2085,7 +2085,7 @@
       "files_changed": 2,
       "lines_changed": 421,
       "confidence": "medium",
-      "caveats": "Replaces xss-sanitizer-removed. Base is a branch commit of the #1327 branch (ancestor of main, not of flowise@1.4.3); head is its first parent, so the first-parent rule in secbench/pr_history.py holds, and the reviewer sees the reversed diff. e67c4315 later dropped these validators for the middleware, which is why the merged #1327 pair is weaker. Not run: that .escape() writes back to req.params is express-validator behaviour known from its documentation, not from code in this repo (the package is not vendored). The diff is noisy: most of its 421 lines remove validator boilerplate across many routes. Reversal also removes the fileName checks (GHSL-2023-232, base lines 1106-1111) and the escape on GHSL-2023-246's route (base line 350); a grader must accept both as correct findings here. The forward direction is not offered as a control because of validator typos such as param('chatId') on /:id routes (base lines 521, 531).",
+      "caveats": "Replaces xss-sanitizer-removed. Base is a branch commit of the #1327 branch (ancestor of main, not of flowise@1.4.3); head is its first parent, so the first-parent rule in benchmark/pr_history.py holds, and the reviewer sees the reversed diff. e67c4315 later dropped these validators for the middleware, which is why the merged #1327 pair is weaker. Not run: that .escape() writes back to req.params is express-validator behaviour known from its documentation, not from code in this repo (the package is not vendored). The diff is noisy: most of its 421 lines remove validator boilerplate across many routes. Reversal also removes the fileName checks (GHSL-2023-232, base lines 1106-1111) and the escape on GHSL-2023-246's route (base line 350); a grader must accept both as correct findings here. The forward direction is not offered as a control because of validator typos such as param('chatId') on /:id routes (base lines 521, 531).",
       "control_scope": "this_diff_only",
       "also_valid": [
         {

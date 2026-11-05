@@ -36,7 +36,7 @@ def api_key():
 
 def call_jev(payload, key, timeout=60):
     request = urllib.request.Request(API_URL, data=json.dumps(payload).encode(), method="POST", headers={
-        "Authorization": "Bearer " + key, "Content-Type": "application/json", "User-Agent": "secbench"})
+        "Authorization": "Bearer " + key, "Content-Type": "application/json", "User-Agent": "security-review-benchmark"})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.load(response)

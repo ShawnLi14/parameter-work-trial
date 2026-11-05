@@ -3,10 +3,10 @@ import os
 import unittest
 from unittest import mock
 
-from secbench import judge
-from secbench.catalog import digest
-from secbench.runner import validate_output
-from secbench.scoring import score
+from benchmark import judge
+from benchmark.catalog import digest
+from benchmark.runner import validate_output
+from benchmark.scoring import score
 
 KEY = "apik-test-secret"
 

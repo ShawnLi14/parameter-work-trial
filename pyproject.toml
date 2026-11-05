@@ -10,11 +10,11 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.scripts]
-secbench = "secbench.cli:main"
+benchmark = "benchmark.cli:main"
 security-review = "reviewer.cli:main"
 
 [tool.setuptools.package-data]
-secbench = ["data/*.json"]
+benchmark = ["data/*.json"]
 
 [tool.setuptools.packages.find]
-include = ["secbench*", "reviewer*"]
+include = ["benchmark*", "reviewer*"]

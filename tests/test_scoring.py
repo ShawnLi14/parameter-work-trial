@@ -1,9 +1,9 @@
 import copy
 import unittest
 
-from secbench.catalog import digest, load
-from secbench.runner import validate_output
-from secbench.scoring import grade_template, score
+from benchmark.catalog import digest, load
+from benchmark.runner import validate_output
+from benchmark.scoring import grade_template, score
 
 
 class ScoringTests(unittest.TestCase):

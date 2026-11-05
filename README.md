@@ -1,22 +1,39 @@
 # Security review benchmark
 
-This repository has two parts:
+This repository has two parts, plus their tests:
 
-- **`secbench`**: a benchmark of 67 real upstream pull requests from six open-source
-  projects. A reviewer sees each PR's diff and reports any vulnerability the PR
-  introduces; adjudicated findings are scored against known advisory targets.
-- **`reviewer`**: a baseline single-call reviewer that sends the diff to a model.
+- **`benchmark/`**: 67 real upstream pull requests from six open-source projects. A
+  reviewer sees each PR's diff and reports any vulnerability the PR introduces;
+  findings are graded against known advisory targets and scored. The cases are in
+  `benchmark/data/cases.json`, built from `manifest.json` and `targets.json` there.
+- **`reviewer/`**: a baseline single-call reviewer that sends the diff to a model.
   See [reviewer/README.md](reviewer/README.md).
+- **`tests/`**: unit tests for both, and `empty_agent.py`, a protocol smoke test.
 
 Python 3.11+ and Git are required. Neither part has third-party runtime dependencies.
-No model performance has been measured yet.
+
+## Baseline result
+
+The bundled reviewer with Cerebras `gpt-oss-120b`, one model call per PR, reviewed all
+67 cases in 91 seconds. One case failed on invalid model JSON and counts as missed.
+
+| | All | Dev (40) | Held-out (27) |
+|---|---|---|---|
+| Known bugs found (recall) | 26 of 37 (70%) | 14 of 21 (67%) | 12 of 16 (75%) |
+| Precision | 29% | 26% | 33% |
+| Clean PRs with a false alarm | 29 of 40 (73%) | 20 of 26 | 9 of 14 |
+
+It finds 77% of bugs in PRs that added them and 60% in reversed fixes, but raises a
+false alarm on most clean PRs. Grading: Jev drafted all 106 decisions; the 13 it left
+unresolved were decided by Claude, approved by the user, under the strict rule
+below. No independent human checked the grades. This is one run at temperature 0.
 
 ## The PR suite
 
 The projects are Flowise, DataHub, MarkUs, Camaleon CMS, RVC WebUI, and GPT-SoVITS.
 Their 49 vulnerabilities, from seven GitHub Security Lab reports, are listed in
-`secbench/data/targets.json`. The suite uses 37 of them; the other 12 had no clean
-commit pair and are listed with reasons in `benchmarks/pr-v2/manifest.json`.
+`benchmark/data/targets.json`. The suite uses 37 of them; the other 12 had no clean
+commit pair and are listed with reasons in `benchmark/data/manifest.json`.
 
 | Case type | Count | What the PR is |
 |---|---|---|
@@ -36,18 +53,19 @@ MarkUs are held out (27 cases). Do not tune a reviewer on held-out cases.
 ## Run the benchmark
 
 ```powershell
-# 1. Fetch the pinned commits (about 540 MB) and write the suite to .bench/pr-v2.
-python -m secbench build
+# 1. Fetch the pinned commits (about 540 MB) and write the suite to .bench/suite.
+python -m benchmark build
 
-# 2. Run a reviewer. It reads one request per case on stdin and writes findings JSON.
-python -m secbench run --split dev --model YOUR_MODEL --out .bench/run.json -- python C:\absolute\path\agent.py
+# 2. Run a reviewer: any command that reads one request on stdin and prints findings JSON.
+#    This runs the bundled reviewer; pass its folder's absolute path.
+python -m benchmark run --split dev --model cerebras/gpt-oss-120b --out .bench/run.json -- python C:\absolute\path\reviewer --provider cerebras
 
-# 3. Adjudicate every finding, then score.
-python -m secbench grade-template --results .bench/run.json --out .bench/grades.json
-python -m secbench score --results .bench/run.json --grades .bench/grades.json --out .bench/score.json
+# 3. Grade every finding (automatically with Jev, or by hand from a template), then score.
+python -m benchmark judge --results .bench/run.json --out .bench/grades.json
+python -m benchmark score --results .bench/run.json --grades .bench/grades.json --out .bench/score.json
 ```
 
-`examples/empty_agent.py` is a protocol smoke test that always returns no findings.
+`tests/empty_agent.py` is a protocol smoke test that always returns no findings.
 A full pass over all 67 cases with it takes about 12 seconds.
 
 ## Reviewer protocol
@@ -94,8 +112,8 @@ reported as an error if the reviewer changed it. This is slow: several minutes p
 DataHub case. To unpack one case by hand, such as to mount it in a sandbox:
 
 ```powershell
-python -m secbench unpack --case h001
-python -m secbench unpack --case h001 --remove
+python -m benchmark unpack --case h001
+python -m benchmark unpack --case h001 --remove
 ```
 
 ## Grading
@@ -126,8 +144,8 @@ from named options and reports probabilities but writes no text. Set `JEV_API_KE
 in `.env`, then grade and score as usual:
 
 ```powershell
-python -m secbench judge --results .bench/run.json --out .bench/grades.json
-python -m secbench score --results .bench/run.json --grades .bench/grades.json --out .bench/score.json
+python -m benchmark judge --results .bench/run.json --out .bench/grades.json
+python -m benchmark score --results .bench/run.json --grades .bench/grades.json --out .bench/score.json
 ```
 
 Jev makes one call per case. It sees the reviewer's whole output for that case,
@@ -163,7 +181,7 @@ fixes that did not work, and "clean" commits that added a weakness. Nothing was
 executed and no human reviewed the labels, so a label means "reviewed from
 source", not "exploit reproduced".
 
-`python -m secbench build` re-checks every entry: the pair must be parent and child,
+`python -m benchmark build` re-checks every entry: the pair must be parent and child,
 the diff must change code within size limits, every quoted line must exist at its
 commit, every claimed absence must hold, and a control must have no known issue.
 Case numbers come from a hash, so their order reveals nothing.

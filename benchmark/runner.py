@@ -100,7 +100,7 @@ def remove_case(lock):
             pass
         except OSError as error:
             # A reviewer's child process can still hold a file; the next unpack retries.
-            print(f"secbench: could not remove {path}: {error}", file=sys.stderr)
+            print(f"benchmark: could not remove {path}: {error}", file=sys.stderr)
 
 
 @contextlib.contextmanager

@@ -25,10 +25,10 @@ From the project root in PowerShell:
 python -m reviewer --pr https://github.com/OWNER/REPO/pull/123 --out .reviews/pr-123.json --record .reviews/pr-123-trace.json
 
 # One local unified diff. This example is synthetic; it is not a benchmark case.
-python -m reviewer --diff examples/review.diff --out .reviews/example.json --record .reviews/example-trace.json
+python -m reviewer --diff reviewer/example.diff --out .reviews/example.json --record .reviews/example-trace.json
 
 # Inspect the exact model payload without a key, network call, or model inference.
-python -m reviewer --diff examples/review.diff --dry-run
+python -m reviewer --diff reviewer/example.diff --dry-run
 ```
 
 To use Cerebras instead of OpenRouter, set `CEREBRAS_API_KEY` and pass
@@ -58,7 +58,7 @@ To use an installed console command:
 
 ```powershell
 python -m pip install -e .
-security-review --diff examples/review.diff
+security-review --diff reviewer/example.diff
 ```
 
 ## Benchmark integration
@@ -68,17 +68,17 @@ It supports the benchmark's `mode: "pr"` protocol. It only sends the `diff` and,
 when provided, explicitly allowed `pr` metadata. It ignores the lookup command,
 task IDs, instructions, and any other fields. Other modes are rejected.
 
-The benchmark runs each reviewer in an empty temporary folder. Use the
-absolute-path wrapper so imports work without installation:
+The benchmark runs each reviewer in an empty temporary folder, so pass the
+reviewer folder's absolute path; it puts itself on the import path:
 
 ```powershell
-$agent = (Resolve-Path scripts/review_baseline.py).Path
+$reviewer = (Resolve-Path reviewer).Path
 $python = (Get-Command python).Source
-python -m secbench run --split dev --model 'nvidia/nemotron-3-ultra-550b-a55b:free' --timeout 300 --out .bench/nemotron-baseline.json -- $python $agent
+python -m benchmark run --split dev --model cerebras/gpt-oss-120b --out .bench/run.json -- $python $reviewer --provider cerebras
 ```
 
-Build the suite first with `python -m secbench build`, as described in the root README.
-The output is compatible with `secbench` (`findings` plus an additional `metadata`
+Build the suite first with `python -m benchmark build`, as described in the root README.
+The output is compatible with the benchmark (`findings` plus an additional `metadata`
 object). The harness retains usage metadata in each case's output. Keep its model
 label consistent with `--model`/`REVIEW_MODEL`. Use a distinct output file for each
 run. Model output must be adjudicated using the benchmark's scorer; these tests do

@@ -15,10 +15,10 @@ from reviewer.cli import main
 from reviewer.config import load_environment
 from reviewer.http import request_bytes
 from reviewer.inputs import context_from_request, fetch_pr
-from secbench.runner import validate_output
+from benchmark.runner import validate_output
 
 ROOT = Path(__file__).resolve().parents[1]
-DIFF = (ROOT / "examples/review.diff").read_text(encoding="utf-8")
+DIFF = (ROOT / "reviewer/example.diff").read_text(encoding="utf-8")
 FINDING = {"title": "Command injection", "severity": "high", "description": "The change enables shell evaluation of request input.",
            "path": "app.py", "line": 5, "side": "head", "evidence": ["app.py:5: shell=True"]}
 
@@ -149,7 +149,7 @@ class TransportTests(unittest.TestCase):
 class CliTests(unittest.TestCase):
     def test_wrapper_works_from_benchmark_cwd_without_installation(self):
         with tempfile.TemporaryDirectory() as directory:
-            process = subprocess.run([sys.executable, str(ROOT / "scripts/review_baseline.py"), "--dry-run"],
+            process = subprocess.run([sys.executable, str(ROOT / "reviewer"), "--dry-run"],
                                      input=json.dumps({"mode": "pr", "diff": DIFF}), cwd=directory,
                                      capture_output=True, text=True, timeout=30)
         self.assertEqual(process.returncode, 0, process.stderr)
@@ -167,7 +167,7 @@ class CliTests(unittest.TestCase):
     def test_missing_key_emits_no_success_json(self):
         stdout, stderr = io.StringIO(), io.StringIO()
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": ""}), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            code = main(["--diff", str(ROOT / "examples/review.diff")])
+            code = main(["--diff", str(ROOT / "reviewer/example.diff")])
         self.assertEqual(code, 2)
         self.assertEqual(stdout.getvalue(), "")
         self.assertIn("OPENROUTER_API_KEY", stderr.getvalue())
@@ -246,7 +246,7 @@ class CerebrasProviderTests(unittest.TestCase):
         stdout = io.StringIO()
         with patch.dict(os.environ, {"REVIEW_MODEL": "nvidia/some-openrouter-model"}), \
                 contextlib.redirect_stdout(stdout):
-            self.assertEqual(0, main(["--diff", str(ROOT / "examples/review.diff"), "--provider", "cerebras", "--dry-run"]))
+            self.assertEqual(0, main(["--diff", str(ROOT / "reviewer/example.diff"), "--provider", "cerebras", "--dry-run"]))
         payload = json.loads(stdout.getvalue())
         self.assertEqual("gpt-oss-120b", payload["model"])
         self.assertIn("cerebras", PROVIDERS)

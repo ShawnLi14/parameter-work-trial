@@ -8,13 +8,13 @@ from .catalog import TARGETS, digest, load
 from .runner import checked_lock, read_json, remove_case, run, task, unpack_case, write_json
 from .scoring import grade_template, score
 
-SUITE = Path("benchmarks/pr-v2/catalog.json")
-WORK = Path(".bench/pr-v2")
+SUITE = Path("benchmark/data/cases.json")
+WORK = Path(".bench/suite")
 
 
 def lookup_command(args):
     """The command a reviewer appends a lookup action to; it carries no commit IDs."""
-    return [sys.executable, "-m", "secbench", "--catalog", str(Path(args.catalog).resolve()),
+    return [sys.executable, "-m", "benchmark", "--catalog", str(Path(args.catalog).resolve()),
             "lookup", "--work", str(Path(args.work).resolve())]
 
 
@@ -33,8 +33,8 @@ def main(argv=None):
     sub.add_parser("list")
     build = sub.add_parser("build", help="fetch the pinned commits and write the PR suite")
     build.add_argument("--targets", type=Path, default=TARGETS, help="advisory target list the labels come from")
-    build.add_argument("--manifest", type=Path, default=Path("benchmarks/pr-v2/manifest.json"))
-    build.add_argument("--cache", type=Path, default=Path(".bench/pr-v2-cache"))
+    build.add_argument("--manifest", type=Path, default=Path("benchmark/data/manifest.json"))
+    build.add_argument("--cache", type=Path, default=Path(".bench/repos"))
     build.add_argument("--out", type=Path, default=WORK)
     build.add_argument("--check-only", action="store_true", help="fetch and verify every entry without writing a suite")
     look = sub.add_parser("lookup", help="read, search, or list a case's code from its Git store")
@@ -144,5 +144,5 @@ def main(argv=None):
             print(json.dumps(result, indent=2))
         return 0
     except (ValueError, AssertionError, KeyError, OSError, subprocess.SubprocessError) as e:
-        print(f"secbench: {e}", file=sys.stderr)
+        print(f"benchmark: {e}", file=sys.stderr)
         return 2

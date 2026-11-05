@@ -7,10 +7,10 @@ import tempfile
 import unittest
 from unittest import mock
 
-from secbench import lookup, pr_history
-from secbench.catalog import load
-from secbench.pr_history import build
-from secbench.runner import checked_lock, run
+from benchmark import lookup, pr_history
+from benchmark.catalog import load
+from benchmark.pr_history import build
+from benchmark.runner import checked_lock, run
 
 ROOT = Path(__file__).resolve().parents[1]
 LABEL = "GHSL-2023-232"
@@ -117,7 +117,7 @@ class LookupTests(unittest.TestCase):
             "match = json.loads(out)['matches'][0]\n"
             "print(json.dumps({'findings': [{'title': 'Shell injection', 'description': 'name reaches shell',\n"
             "    'path': match['path'], 'line': match['line'], 'evidence': [match['text']]}]}))\n", encoding="utf-8")
-        command = [sys.executable, "-m", "secbench", "--catalog", str(self.catalog), "lookup", "--work", str(self.suite_dir)]
+        command = [sys.executable, "-m", "benchmark", "--catalog", str(self.catalog), "lookup", "--work", str(self.suite_dir)]
         with mock.patch.dict(os.environ, {"PYTHONPATH": str(ROOT)}):
             row = run(self.suite, [self.case], self.suite_dir, [sys.executable, str(agent)], "probe", 60, command)["cases"][0]
         self.assertEqual("ok", row["status"], row.get("error"))

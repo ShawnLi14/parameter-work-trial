@@ -4,3 +4,8 @@ __pycache__/
 .bench/
 build/
 dist/
+.env
+.env.*
+!.env.example
+.reviews/
+.vscode/

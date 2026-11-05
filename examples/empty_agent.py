@@ -3,5 +3,5 @@ import json
 import sys
 
 request = json.load(sys.stdin)
-assert request["mode"] in {"snapshot","pr"}
+assert request["mode"] == "pr"
 print(json.dumps({"findings": []}))

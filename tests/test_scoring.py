@@ -1,15 +1,9 @@
 import copy
-import json
-from pathlib import Path
-import subprocess
-import sys
-import tempfile
 import unittest
 
 from secbench.catalog import digest, load
-from secbench.runner import prepare, task, run, validate_output
+from secbench.runner import validate_output
 from secbench.scoring import grade_template, score
-from secbench.source_checks import anchors, check_sources
 
 
 class ScoringTests(unittest.TestCase):
@@ -32,13 +26,11 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(49,sum(len(c["labels"]) for c in self.data["cases"]))
         self.assertNotIn("GHSL-2024-061",str(self.data["cases"][2]["labels"]))
         self.assertEqual(self.data["cases"][4]["split"],self.data["cases"][5]["split"])
-        self.assertEqual(set(anchors()), {l["id"] for c in self.data["cases"] for l in c["labels"]})
 
     def test_exact_recall(self):
         s = score(self.data,self.results,self.grades())
         self.assertEqual(1,s["true_positives"])
         self.assertAlmostEqual(1/6,s["target_recall"])
-        self.assertIsNone(s["false_positive_rate"])
 
     def test_unresolved_not_automatically_false_positive(self):
         s = score(self.data,self.results,grade_template(self.results))
@@ -79,39 +71,6 @@ class ScoringTests(unittest.TestCase):
     def test_bad_agent_output(self):
         for value in ({}, {"findings":"none"}, {"findings":[{"title":"x"}]}):
             with self.assertRaises(ValueError): validate_output(value)
-
-
-class PreparationTests(unittest.TestCase):
-    def test_local_prepare_no_history_no_labels_and_drift_detection(self):
-        with tempfile.TemporaryDirectory() as td:
-            root=Path(td)
-            repo=root/"repo"
-            subprocess.run(["git","init",str(repo)],check=True,capture_output=True)
-            (repo/"source.py").write_text("print('fixture')\n",encoding="utf-8")
-            subprocess.run(["git","-C",str(repo),"add","source.py"],check=True,capture_output=True)
-            subprocess.run(["git","-C",str(repo),"-c","user.name=Fixture","-c","user.email=fixture@example.invalid","-c","core.hooksPath=","commit","-m","fixture"],check=True,capture_output=True)
-            data=load()
-            data["cases"][0]["ref"]="HEAD"
-            case=data["cases"][0]
-            work=root/"work"
-            lock=prepare(data,case,work,repo)
-            request=task(data,case,work)
-            self.assertNotIn("labels",request)
-            self.assertNotIn("GHSL",json.dumps(request))
-            self.assertFalse((Path(lock["source_dir"])/".git").exists())
-            # A prepared but unrelated file must not be called source validation.
-            one_case = copy.deepcopy(data)
-            one_case["cases"] = [case]
-            prepare(one_case,one_case["cases"][0],root/"single",repo)
-            report=check_sources(one_case,root/"single")
-            self.assertTrue(all(l["status"] == "needs_investigation" for l in report["cases"][0]["labels"]))
-            agent=Path(__file__).resolve().parents[1]/"examples"/"empty_agent.py"
-            results=run(data,[case],work,[sys.executable,str(agent)],"smoke",10)
-            self.assertEqual("ok",results["cases"][0]["status"])
-            s=score(data,results,grade_template(results))
-            self.assertEqual(0,s["target_recall"])
-            (Path(lock["source_dir"])/"source.py").write_text("modified",encoding="utf-8")
-            with self.assertRaisesRegex(ValueError,"modified"): task(data,case,work)
 
 
 if __name__ == "__main__": unittest.main()

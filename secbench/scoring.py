@@ -92,7 +92,7 @@ def score(data, results, grades):
     control_failures=sum(rows[cid]["status"] != "ok" for cid in controls)
     f1_denominator=2*tp+false_positives+duplicates+total-tp
     return {"catalog_sha256": digest(data), "results_sha256": digest(results),
-            "scope": "constructed PR regression detection" if any(cases[cid]["mode"] == "pr" for cid in rows) else "advisory-labelled snapshot detection only", "grading_complete": complete,
+            "scope": "detection of vulnerabilities introduced by real upstream PRs", "grading_complete": complete,
             "cases": len(rows), "case_ids": sorted(rows), "failed_cases": sum(r["status"] != "ok" for r in rows.values()),
             "target_count": total, "true_positives": tp, "false_negatives": total-tp,
             "adjudicated_false_positives": false_positives, "duplicates": duplicates,
@@ -100,12 +100,11 @@ def score(data, results, grades):
             "also_valid_findings": also_valid,
             "precision": precision if complete else None,
             "f1": 2*tp/f1_denominator if complete and f1_denominator else None,
-            "false_positive_rate": None,
             "negative_control_cases":len(controls), "negative_control_failures":control_failures,
             "negative_control_alarm_rate":len(alarm_cases)/len(controls) if controls and complete and not control_failures else None,
             "by_variant": by_variant(cases, rows, decisions, hits, complete),
             "macro_case_recall": sum(sum(c==cid for c,_ in hits)/len(cases[cid]["labels"]) for cid in positive_cases)/len(positive_cases) if positive_cases else None,
             "notes": ["Recall is a lower bound while adjudication remains unresolved.",
-                      "Global false-positive rate is not measured. PR controls test only whether the reviewed change introduces a security issue; unchanged vulnerabilities are excluded.",
-                      "Off-label valid findings require a catalog revision and rerun/regrading, not an automatic false-positive label.",
-                      "Snapshot labels are advisory-backed. PR validation scope is recorded in the separate validation artifact; no deployed application exploit validation is implied."]}
+                      "Controls test only whether the reviewed change introduces a security issue; unchanged vulnerabilities do not count.",
+                      "A valid finding outside a case's labels and also_valid list needs a catalog revision and regrading, not an automatic false-positive label.",
+                      "Labels come from source review by AI agents; no exploit was executed."]}

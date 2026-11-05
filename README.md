@@ -130,15 +130,17 @@ python -m secbench judge --results .bench/run.json --out .bench/grades.json
 python -m secbench score --results .bench/run.json --grades .bench/grades.json --out .bench/score.json
 ```
 
-For each finding, Jev sees the finding, the diff for the cited file, and numbered
-code around the cited line. It chooses between the case's targets, its `also_valid`
-issues, a false alarm, or another plausible issue, and separately judges whether the
-code supports the claim. It never sees commit IDs or the API key. A finding whose
-file exists on neither side is a false positive without a call. A confident,
-supported target choice is a `match` (extra matches of one target become
-`duplicate`), a confident `also_valid` choice is accepted, and a confident false
-alarm is a `false_positive`. Everything else, including other plausible issues,
-stays `unresolved` for a person, so precision and F1 stay unset until it is settled.
+Jev makes one call per case. It sees the reviewer's whole output for that case,
+explanations included, next to the case's known bugs, and answers for each finding
+which known bug it describes, or none. It judges alignment with the known bugs
+only: it does not check the code, and it never sees commit IDs or the API key. A
+confident bug choice is a `match` (extra matches of one bug become `duplicate`), a
+confident `also_valid` choice is accepted, and a confident "none" is a
+`false_positive`. Anything below the threshold stays `unresolved` for a person.
+
+Because "none" counts as a false positive, a real bug the labels missed is also
+scored as one, so precision can be understated. Review a sample of false
+positives, and add any real new bug to the case's `also_valid` list.
 
 Each decision's rationale records Jev's choice and confidence, its full answer is
 kept under `judge`, and `adjudicator` names the exact Jev version and threshold, so

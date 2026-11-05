@@ -71,7 +71,6 @@ def main(argv=None):
     template.add_argument("--out", required=True)
     judging = sub.add_parser("judge", help="draft adjudications automatically with TypeSafe AI's Jev (needs JEV_API_KEY)")
     judging.add_argument("--results", required=True)
-    judging.add_argument("--work", type=Path, default=WORK)
     judging.add_argument("--out", required=True)
     judging.add_argument("--threshold", type=float, default=0.7, help="minimum confidence to resolve a finding")
     judging.add_argument("--model", default="jev-latest")
@@ -133,7 +132,7 @@ def main(argv=None):
             write_json(args.out, grade_template(read_json(args.results)))
         elif args.action == "judge":
             from .judge import grade
-            grades = grade(data, read_json(args.results), args.work, threshold=args.threshold, model=args.model)
+            grades = grade(data, read_json(args.results), threshold=args.threshold, model=args.model)
             write_json(args.out, grades)
             counts = {}
             for d in grades["decisions"]:

@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import sys
 
-from .baseline import DEFAULT_MODEL, build_payload, review
+from .baseline import PROVIDERS, build_payload, review
 from .config import load_environment
 from .inputs import context_from_request, fetch_pr
 
@@ -31,10 +31,11 @@ def main(argv=None):
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--pr", help="https://github.com/OWNER/REPO/pull/NUMBER")
     source.add_argument("--diff", type=Path, help="local UTF-8 unified diff")
-    parser.add_argument("--model", help="override REVIEW_MODEL from environment or project .env")
+    parser.add_argument("--provider", choices=sorted(PROVIDERS), help="model provider (default: REVIEW_PROVIDER, else openrouter)")
+    parser.add_argument("--model", help="override the model; REVIEW_MODEL applies to OpenRouter only")
     parser.add_argument("--out", type=Path, help="write review JSON here instead of stdout")
     parser.add_argument("--record", type=Path, help="save exact prompt and raw response (contains source code; no API key)")
-    parser.add_argument("--dry-run", action="store_true", help="emit exact model payload without calling OpenRouter")
+    parser.add_argument("--dry-run", action="store_true", help="emit exact model payload without calling the provider")
     parser.add_argument("--max-input-chars", type=positive_int, default=200_000)
     parser.add_argument("--max-tokens", type=positive_int, default=16384, help="output allowance, including reasoning")
     parser.add_argument("--reasoning-effort", choices=["none", "medium", "high"], default="medium")
@@ -42,7 +43,12 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         environment = load_environment()
-        args.model = args.model or environment.get("REVIEW_MODEL") or DEFAULT_MODEL
+        args.provider = args.provider or environment.get("REVIEW_PROVIDER") or "openrouter"
+        if args.provider not in PROVIDERS:
+            raise ValueError(f"Unknown provider {args.provider!r}")
+        # REVIEW_MODEL names an OpenRouter model, so it never applies to another provider.
+        configured = environment.get("REVIEW_MODEL") if args.provider == "openrouter" else None
+        args.model = args.model or configured or PROVIDERS[args.provider]["model"]
         if args.pr:
             request = fetch_pr(args.pr, environment.get("GITHUB_TOKEN") or environment.get("GH_TOKEN"))
         elif args.diff:
@@ -56,11 +62,11 @@ def main(argv=None):
             request = json.loads(text)
         context = context_from_request(request, args.max_input_chars)
         if args.dry_run:
-            result = build_payload(context, args.model, args.max_tokens, args.reasoning_effort)
+            result = build_payload(context, args.model, args.max_tokens, args.reasoning_effort, args.provider)
         else:
-            result = review(context, environment.get("OPENROUTER_API_KEY"), model=args.model,
+            result = review(context, environment.get(PROVIDERS[args.provider]["key"]), model=args.model,
                             max_tokens=args.max_tokens, reasoning_effort=args.reasoning_effort,
-                            timeout=args.timeout,
+                            timeout=args.timeout, provider=args.provider,
                             record=(lambda trace: write_json(args.record, trace)) if args.record else None)
         if args.out:
             write_json(args.out, result)

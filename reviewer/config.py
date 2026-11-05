@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
-CONFIG_KEYS = {"OPENROUTER_API_KEY", "REVIEW_MODEL", "GITHUB_TOKEN", "GH_TOKEN"}
+CONFIG_KEYS = {"OPENROUTER_API_KEY", "CEREBRAS_API_KEY", "REVIEW_PROVIDER", "REVIEW_MODEL", "GITHUB_TOKEN", "GH_TOKEN"}
 
 
 def load_environment(path=None):

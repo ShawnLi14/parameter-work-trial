@@ -31,6 +31,11 @@ python -m reviewer --diff examples/review.diff --out .reviews/example.json --rec
 python -m reviewer --diff examples/review.diff --dry-run
 ```
 
+To use Cerebras instead of OpenRouter, set `CEREBRAS_API_KEY` and pass
+`--provider cerebras` (or set `REVIEW_PROVIDER=cerebras`). Its default model is
+`gpt-oss-120b`; `REVIEW_MODEL` applies to OpenRouter only. On six dev cases it took
+1 to 2 seconds per review.
+
 Optionally set `GITHUB_TOKEN` (or `GH_TOKEN`) for authenticated GitHub fetching.
 The reviewer only fetches metadata and the diff; it never posts GitHub comments.
 For private PRs, first ensure that your chosen model endpoint permits the data.

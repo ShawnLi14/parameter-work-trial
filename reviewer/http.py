@@ -7,7 +7,9 @@ from urllib.request import Request, urlopen
 
 def request_bytes(url, *, headers=None, payload=None, timeout=240, max_bytes=8_000_000):
     body = None if payload is None else json.dumps(payload).encode("utf-8")
-    request = Request(url, data=body, headers=headers or {})
+    # Some providers' firewalls reject Python's default user agent (Cerebras returns 403).
+    headers = {"User-Agent": "security-review-baseline", **(headers or {})}
+    request = Request(url, data=body, headers=headers)
     try:
         with urlopen(request, timeout=timeout) as response:
             content = response.read(max_bytes + 1)

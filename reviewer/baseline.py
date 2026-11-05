@@ -11,19 +11,32 @@ from .prompt import PROMPT_VERSION, SYSTEM_PROMPT
 
 DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 BASE_URL = "https://openrouter.ai/api/v1"
+# Both providers speak the OpenAI chat-completions format; they differ in endpoint,
+# key, default model, and how reasoning effort and output length are requested.
+PROVIDERS = {
+    "openrouter": {"url": BASE_URL, "key": "OPENROUTER_API_KEY", "model": DEFAULT_MODEL},
+    "cerebras": {"url": "https://api.cerebras.ai/v1", "key": "CEREBRAS_API_KEY", "model": "gpt-oss-120b"},
+}
 
 
 def sha256(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def build_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effort="medium"):
+def build_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effort="medium", provider="openrouter"):
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": json.dumps(context, ensure_ascii=False, sort_keys=True)},
+    ]
+    if provider == "cerebras":
+        # gpt-oss always reasons; "low" is the closest setting to none.
+        return {"model": model, "messages": messages, "temperature": 0,
+                "max_completion_tokens": max_tokens,
+                "reasoning_effort": "low" if reasoning_effort == "none" else reasoning_effort,
+                "stream": False}
     return {
         "model": model,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": json.dumps(context, ensure_ascii=False, sort_keys=True)},
-        ],
+        "messages": messages,
         "temperature": 0,
         "max_tokens": max_tokens,
         "reasoning": {"effort": reasoning_effort},
@@ -92,19 +105,21 @@ def parse_response(response):
 
 
 def review(context, api_key, *, model=DEFAULT_MODEL, max_tokens=16384,
-           reasoning_effort="medium", timeout=240, record=None):
+           reasoning_effort="medium", timeout=240, record=None, provider="openrouter"):
+    settings = PROVIDERS[provider]
     if not api_key or not api_key.strip():
-        raise ValueError("Set OPENROUTER_API_KEY before running a live review")
-    payload = build_payload(context, model, max_tokens, reasoning_effort)
+        raise ValueError(f"Set {settings['key']} before running a live review")
+    payload = build_payload(context, model, max_tokens, reasoning_effort, provider)
     trace = {"agent_version": __version__, "prompt_version": PROMPT_VERSION, "request": payload}
     if record:
         record(trace)
     start = time.monotonic()
     try:
-        response = request_json(BASE_URL + "/chat/completions", payload=payload, timeout=timeout,
-                                headers={"Authorization": f"Bearer {api_key}",
-                                         "Content-Type": "application/json",
-                                         "X-OpenRouter-Title": "Security PR Review Baseline"})
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        if provider == "openrouter":
+            headers["X-OpenRouter-Title"] = "Security PR Review Baseline"
+        response = request_json(settings["url"] + "/chat/completions", payload=payload, timeout=timeout,
+                                headers=headers)
         trace["response"] = response
         if record:
             record(trace)
@@ -124,7 +139,7 @@ def review(context, api_key, *, model=DEFAULT_MODEL, max_tokens=16384,
         "context_sha256": sha256(payload["messages"][1]["content"]),
         "request_sha256": sha256(json.dumps(payload, sort_keys=True)),
         "requested_model": model, "returned_model": response.get("model"),
-        "provider": response.get("provider"), "response_id": response.get("id"),
+        "provider": response.get("provider") or provider, "response_id": response.get("id"),
         "usage": usage, "cost_usd": cost if cost is not None else estimate,
         "cost_source": "provider" if cost is not None else ("free_variant_estimate" if estimate is not None else "unknown"),
         "elapsed_seconds": round(time.monotonic() - start, 3), "model_calls": 1,

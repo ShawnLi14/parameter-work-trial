@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 
-from reviewer.baseline import DEFAULT_MODEL, build_payload, parse_response, review
+from reviewer.baseline import DEFAULT_MODEL, PROVIDERS, build_payload, parse_response, review
 from reviewer.cli import main
 from reviewer.config import load_environment
 from reviewer.http import request_bytes
@@ -201,6 +201,55 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "line 1") as raised:
                 load_environment(path)
             self.assertNotIn("secret", str(raised.exception))
+
+
+class CerebrasProviderTests(unittest.TestCase):
+    def test_payload_uses_cerebras_fields_only(self):
+        payload = build_payload({"diff": DIFF}, "gpt-oss-120b", 8000, "none", "cerebras")
+        self.assertEqual("low", payload["reasoning_effort"])
+        self.assertEqual(8000, payload["max_completion_tokens"])
+        for openrouter_only in ("provider", "reasoning", "max_tokens"):
+            self.assertNotIn(openrouter_only, payload)
+
+    def test_review_calls_cerebras_with_its_key_and_no_openrouter_header(self):
+        calls = []
+
+        def fake(url, **kwargs):
+            calls.append((url, kwargs))
+            return {"id": "c1", "model": "gpt-oss-120b",
+                    "choices": [{"finish_reason": "stop", "message": {"content": '{"findings": []}'}}]}
+        with patch("reviewer.baseline.request_json", fake):
+            result = review({"diff": DIFF}, "csk-test", model="gpt-oss-120b", provider="cerebras")
+        url, kwargs = calls[0]
+        self.assertEqual("https://api.cerebras.ai/v1/chat/completions", url)
+        self.assertEqual("Bearer csk-test", kwargs["headers"]["Authorization"])
+        self.assertNotIn("X-OpenRouter-Title", kwargs["headers"])
+        self.assertEqual("cerebras", result["metadata"]["provider"])
+        with self.assertRaisesRegex(ValueError, "CEREBRAS_API_KEY"):
+            review({"diff": DIFF}, "", provider="cerebras")
+
+    def test_requests_carry_a_named_user_agent(self):
+        seen = []
+
+        class Response(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+        with patch("reviewer.http.urlopen", lambda request, timeout: seen.append(request) or Response(b"{}")):
+            request_bytes("https://api.cerebras.ai/v1/models", headers={"Authorization": "Bearer x"})
+        self.assertEqual("security-review-baseline", seen[0].get_header("User-agent"))
+        self.assertEqual("Bearer x", seen[0].get_header("Authorization"))
+
+    def test_cli_ignores_openrouter_model_setting_for_cerebras(self):
+        stdout = io.StringIO()
+        with patch.dict(os.environ, {"REVIEW_MODEL": "nvidia/some-openrouter-model"}), \
+                contextlib.redirect_stdout(stdout):
+            self.assertEqual(0, main(["--diff", str(ROOT / "examples/review.diff"), "--provider", "cerebras", "--dry-run"]))
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual("gpt-oss-120b", payload["model"])
+        self.assertIn("cerebras", PROVIDERS)
 
 
 if __name__ == "__main__":

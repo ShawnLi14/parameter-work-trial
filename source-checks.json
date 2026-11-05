@@ -1,0 +1,761 @@
+{
+  "catalog_sha256": "d637d699d3c656bc3e4511c5a70472d5c4bad2346d5bc07a46755bc2e01be9ee",
+  "scope": "symbol presence only; not exploit validation",
+  "cases": [
+    {
+      "case_id": "t001",
+      "repository": "FlowiseAI/Flowise",
+      "commit": "19e9c67d12190e80869a6ca338fb2082430614fd",
+      "tree_sha256": "b3bdb532a0d7d8162bc923e0345279de7000a8778f3d6ba8210d4e1d8dc35962",
+      "labels": [
+        {
+          "label_id": "GHSL-2023-232",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "packages/server/src/index.ts",
+              "line": 142,
+              "file_sha256": "20c032bb68c09ace0ae3b3b68bc1435d65084749e8228bfdbccf2f9e9f100eca"
+            },
+            {
+              "path": "packages/server/src/index.ts",
+              "line": 971,
+              "file_sha256": "20c032bb68c09ace0ae3b3b68bc1435d65084749e8228bfdbccf2f9e9f100eca"
+            }
+          ],
+          "pattern": "packages/server/src/index.ts",
+          "anchor": "/api/v1/openai-assistants-file"
+        },
+        {
+          "label_id": "GHSL-2023-245",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "packages/server/src/index.ts",
+              "line": 309,
+              "file_sha256": "20c032bb68c09ace0ae3b3b68bc1435d65084749e8228bfdbccf2f9e9f100eca"
+            },
+            {
+              "path": "packages/server/src/index.ts",
+              "line": 340,
+              "file_sha256": "20c032bb68c09ace0ae3b3b68bc1435d65084749e8228bfdbccf2f9e9f100eca"
+            },
+            {
+              "path": "packages/server/src/index.ts",
+              "line": 371,
+              "file_sha256": "20c032bb68c09ace0ae3b3b68bc1435d65084749e8228bfdbccf2f9e9f100eca"
+            }
+          ],
+          "pattern": "packages/server/src/index.ts",
+          "anchor": "/api/v1/chatflows/:id"
+        },
+        {
+          "label_id": "GHSL-2023-246",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "packages/server/src/index.ts",
+              "line": 318,
+              "file_sha256": "20c032bb68c09ace0ae3b3b68bc1435d65084749e8228bfdbccf2f9e9f100eca"
+            }
+          ],
+          "pattern": "packages/server/src/index.ts",
+          "anchor": "/api/v1/public-chatflows/:id"
+        },
+        {
+          "label_id": "GHSL-2023-247",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "packages/server/src/index.ts",
+              "line": 377,
+              "file_sha256": "20c032bb68c09ace0ae3b3b68bc1435d65084749e8228bfdbccf2f9e9f100eca"
+            }
+          ],
+          "pattern": "packages/server/src/index.ts",
+          "anchor": "/api/v1/chatflows-streaming/:id"
+        },
+        {
+          "label_id": "GHSL-2023-248",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "packages/server/src/index.ts",
+              "line": 546,
+              "file_sha256": "20c032bb68c09ace0ae3b3b68bc1435d65084749e8228bfdbccf2f9e9f100eca"
+            },
+            {
+              "path": "packages/server/src/index.ts",
+              "line": 567,
+              "file_sha256": "20c032bb68c09ace0ae3b3b68bc1435d65084749e8228bfdbccf2f9e9f100eca"
+            },
+            {
+              "path": "packages/server/src/index.ts",
+              "line": 583,
+              "file_sha256": "20c032bb68c09ace0ae3b3b68bc1435d65084749e8228bfdbccf2f9e9f100eca"
+            }
+          ],
+          "pattern": "packages/server/src/index.ts",
+          "anchor": "/api/v1/credentials/:id"
+        },
+        {
+          "label_id": "GHSL-2023-234",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "packages/server/src/index.ts",
+              "line": 122,
+              "file_sha256": "20c032bb68c09ace0ae3b3b68bc1435d65084749e8228bfdbccf2f9e9f100eca"
+            }
+          ],
+          "pattern": "packages/server/src/index.ts",
+          "anchor": "this.app.use(cors())"
+        }
+      ]
+    },
+    {
+      "case_id": "t002",
+      "repository": "datahub-project/datahub",
+      "commit": "5bf5fc2d66eb327241cfee9a7c5c1690196dc396",
+      "tree_sha256": "b0be53cb9a6dd6bfa9f7690e18e01f04206b4b3d303350b8986a2770da466365",
+      "labels": [
+        {
+          "label_id": "GHSL-2022-076",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "datahub-frontend/app/controllers/Application.java",
+              "line": 89,
+              "file_sha256": "b348f1633da4317d6a2dd0f06b3e3d0accbe759f64612f1654ac0e25f6684a48"
+            }
+          ],
+          "pattern": "datahub-frontend/app/controllers/Application.java",
+          "anchor": "proxy("
+        },
+        {
+          "label_id": "GHSL-2022-077",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "datahub-frontend/app/controllers/AuthenticationController.java",
+              "line": 84,
+              "file_sha256": "5882089ceb9f0cfc4cbd6fdbef433306a22b208716fb13e2b243e2aedbe2297a"
+            },
+            {
+              "path": "datahub-frontend/app/controllers/AuthenticationController.java",
+              "line": 103,
+              "file_sha256": "5882089ceb9f0cfc4cbd6fdbef433306a22b208716fb13e2b243e2aedbe2297a"
+            }
+          ],
+          "pattern": "datahub-frontend/app/controllers/AuthenticationController.java",
+          "anchor": "redirect(redirectPath)"
+        },
+        {
+          "label_id": "GHSL-2022-078",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "metadata-service/auth-impl/src/main/java/com/datahub/authentication/token/StatelessTokenService.java",
+              "line": 134,
+              "file_sha256": "6346dbf981d3a7b53da9918b06cd1a0b1de66a757073bc468413ea1a24592b06"
+            }
+          ],
+          "pattern": "metadata-service/auth-impl/**/StatelessTokenService.java",
+          "anchor": ".parse(accessToken)"
+        },
+        {
+          "label_id": "GHSL-2022-079",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "metadata-service/auth-impl/src/main/java/com/datahub/authentication/authenticator/NoOpAuthenticator.java",
+              "line": 31,
+              "file_sha256": "d91dffa0c1e34a3e92da1a49d4ba24d9962476d57fb895a485b194749d43bd7e"
+            }
+          ],
+          "pattern": "**/NoOpAuthenticator.java",
+          "anchor": "class NoOpAuthenticator"
+        },
+        {
+          "label_id": "GHSL-2022-080",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "datahub-frontend/app/controllers/Application.java",
+              "line": 110,
+              "file_sha256": "b348f1633da4317d6a2dd0f06b3e3d0accbe759f64612f1654ac0e25f6684a48"
+            },
+            {
+              "path": "datahub-frontend/app/controllers/Application.java",
+              "line": 301,
+              "file_sha256": "b348f1633da4317d6a2dd0f06b3e3d0accbe759f64612f1654ac0e25f6684a48"
+            }
+          ],
+          "pattern": "datahub-frontend/app/controllers/Application.java",
+          "anchor": "String.format("
+        },
+        {
+          "label_id": "GHSL-2022-081",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "datahub-frontend/app/security/AuthenticationManager.java",
+              "line": 38,
+              "file_sha256": "86940f6f1e8a711b03b6eb0f113fb714e758a8d42e6f455a4093e236ca29afdf"
+            }
+          ],
+          "pattern": "datahub-frontend/app/security/AuthenticationManager.java",
+          "anchor": "catch (Exception e)"
+        },
+        {
+          "label_id": "GHSL-2022-082",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "datahub-graphql-core/src/main/java/com/linkedin/datahub/graphql/resolvers/ingest/secret/SecretUtils.java",
+              "line": 31,
+              "file_sha256": "231adb982852b20ab5e475984b5ebda4c924327246562bad9e36dda2599eeab2"
+            },
+            {
+              "path": "datahub-graphql-core/src/main/java/com/linkedin/datahub/graphql/resolvers/ingest/secret/SecretUtils.java",
+              "line": 53,
+              "file_sha256": "231adb982852b20ab5e475984b5ebda4c924327246562bad9e36dda2599eeab2"
+            }
+          ],
+          "pattern": "**/SecretUtils.java",
+          "anchor": "AES/ECB"
+        },
+        {
+          "label_id": "GHSL-2022-083",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "datahub-frontend/app/controllers/CentralLogoutController.java",
+              "line": 41,
+              "file_sha256": "6cf48263d7dd15d6b718effc3d328955f915faa94ea727059e24c73dff68e652"
+            }
+          ],
+          "pattern": "datahub-frontend/app/controllers/CentralLogoutController.java",
+          "anchor": "executeLogout("
+        },
+        {
+          "label_id": "GHSL-2022-086",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "build.gradle",
+              "line": 127,
+              "file_sha256": "a7a4be0646126e80d2650dbcd3763f216adb8e6abff5fee13c33c153ce23054c"
+            },
+            {
+              "path": "build.gradle",
+              "line": 128,
+              "file_sha256": "a7a4be0646126e80d2650dbcd3763f216adb8e6abff5fee13c33c153ce23054c"
+            },
+            {
+              "path": "datahub-frontend/play.gradle",
+              "line": 42,
+              "file_sha256": "ea0d4130d5895c9f901b760c5792a4cf1ae93e8a49768b0c71f91b030b708ff5"
+            }
+          ],
+          "pattern": "**/*.gradle",
+          "anchor": "pac4j"
+        },
+        {
+          "label_id": "GHSL-2022-087",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "metadata-io/src/main/java/com/linkedin/metadata/graph/neo4j/Neo4jGraphService.java",
+              "line": 42,
+              "file_sha256": "3364bf9c22dbc627f12a3e14f03e49cfe16bcfddfc8a9bb0ac6932bdb9272251"
+            },
+            {
+              "path": "metadata-io/src/test/java/com/linkedin/metadata/graph/neo4j/Neo4jGraphServiceTest.java",
+              "line": 25,
+              "file_sha256": "9269e89507eef5ddff6c9a60acf6b8db3ede87f809e97361cb01d00b7d10fed9"
+            },
+            {
+              "path": "metadata-service/factories/src/main/java/com/linkedin/gms/factory/common/Neo4jGraphServiceFactory.java",
+              "line": 18,
+              "file_sha256": "50fe5aa996cbfa1c73377ed0756d15cfe0b0b957a8ec8d124045289d61dc5470"
+            }
+          ],
+          "pattern": "**/*.java",
+          "anchor": "class Neo4jGraphService"
+        }
+      ]
+    },
+    {
+      "case_id": "t003",
+      "repository": "MarkUsProject/Markus",
+      "commit": "bf989ac116da98b28cea6e81ddb51cb7d2622a01",
+      "tree_sha256": "051989f41a107c505b053b824284847c88823a84b181a0d842868cf98518eac4",
+      "labels": [
+        {
+          "label_id": "GHSL-2024-060",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/controllers/submissions_controller.rb",
+              "line": 321,
+              "file_sha256": "60312cc75d315e24ff0cb4ab72b51cb0fbeb3a0b78930492960a6832459d5689"
+            }
+          ],
+          "pattern": "app/controllers/submissions_controller.rb",
+          "anchor": "def update_files"
+        },
+        {
+          "label_id": "GHSL-2024-062",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/controllers/automated_tests_controller.rb",
+              "line": 1,
+              "file_sha256": "00b3d75230964bcbcea6fdae8266ca482614154a7932d7924e26a536e96172b3"
+            }
+          ],
+          "pattern": "app/controllers/automated_tests_controller.rb",
+          "anchor": "class AutomatedTestsController"
+        },
+        {
+          "label_id": "GHSL-2024-063",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/controllers/starter_file_groups_controller.rb",
+              "line": 38,
+              "file_sha256": "565ea37f3b4b15f74c45b026bc150f4f35352acfc6c7b3bcbda5870239a86a35"
+            }
+          ],
+          "pattern": "app/controllers/starter_file_groups_controller.rb",
+          "anchor": "def update_files"
+        },
+        {
+          "label_id": "GHSL-2024-064",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/controllers/api/starter_file_groups_controller.rb",
+              "line": 3,
+              "file_sha256": "6cf99875993dc5edb8ee503976fd838d49e9f33c4ffc131c0280def9b0691c3b"
+            }
+          ],
+          "pattern": "app/controllers/api/starter_file_groups_controller.rb",
+          "anchor": "class StarterFileGroupsController"
+        },
+        {
+          "label_id": "GHSL-2024-065",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/controllers/automated_tests_controller.rb",
+              "line": 105,
+              "file_sha256": "00b3d75230964bcbcea6fdae8266ca482614154a7932d7924e26a536e96172b3"
+            },
+            {
+              "path": "app/controllers/automated_tests_controller.rb",
+              "line": 119,
+              "file_sha256": "00b3d75230964bcbcea6fdae8266ca482614154a7932d7924e26a536e96172b3"
+            }
+          ],
+          "pattern": "app/controllers/automated_tests_controller.rb",
+          "anchor": "def download_file"
+        },
+        {
+          "label_id": "GHSL-2024-066",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/controllers/exam_templates_controller.rb",
+              "line": 265,
+              "file_sha256": "377c318e4df8ff0bde93b055b55bb8823a0400a3a147d17018100b249069f308"
+            }
+          ],
+          "pattern": "app/controllers/exam_templates_controller.rb",
+          "anchor": "def download_error_file"
+        },
+        {
+          "label_id": "GHSL-2024-067",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/controllers/exam_templates_controller.rb",
+              "line": 105,
+              "file_sha256": "377c318e4df8ff0bde93b055b55bb8823a0400a3a147d17018100b249069f308"
+            }
+          ],
+          "pattern": "app/controllers/exam_templates_controller.rb",
+          "anchor": "def download_generate"
+        },
+        {
+          "label_id": "GHSL-2024-068",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/controllers/starter_file_groups_controller.rb",
+              "line": 14,
+              "file_sha256": "565ea37f3b4b15f74c45b026bc150f4f35352acfc6c7b3bcbda5870239a86a35"
+            },
+            {
+              "path": "app/controllers/starter_file_groups_controller.rb",
+              "line": 32,
+              "file_sha256": "565ea37f3b4b15f74c45b026bc150f4f35352acfc6c7b3bcbda5870239a86a35"
+            }
+          ],
+          "pattern": "app/controllers/starter_file_groups_controller.rb",
+          "anchor": "def download_file"
+        }
+      ]
+    },
+    {
+      "case_id": "t004",
+      "repository": "owen2345/camaleon-cms",
+      "commit": "feccb96e542319ed608acd3a16fa5d92f13ede67",
+      "tree_sha256": "2a7b250dbf29315e7ef282226e7fbfc4a66b6d04487fb89933350539dca17f8d",
+      "labels": [
+        {
+          "label_id": "GHSL-2024-182",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/controllers/camaleon_cms/admin/media_controller.rb",
+              "line": 86,
+              "file_sha256": "c911d430937fdebc7ce55daecc8e5e88edf5d5035673736f384265855d72a1b8"
+            }
+          ],
+          "pattern": "app/controllers/camaleon_cms/admin/media_controller.rb",
+          "anchor": "def upload"
+        },
+        {
+          "label_id": "GHSL-2024-183",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/controllers/camaleon_cms/admin/media_controller.rb",
+              "line": 28,
+              "file_sha256": "c911d430937fdebc7ce55daecc8e5e88edf5d5035673736f384265855d72a1b8"
+            }
+          ],
+          "pattern": "app/controllers/camaleon_cms/admin/media_controller.rb",
+          "anchor": "def download_private_file"
+        },
+        {
+          "label_id": "GHSL-2024-184",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/helpers/camaleon_cms/uploader_helper.rb",
+              "line": 23,
+              "file_sha256": "7aac02153ef307c791a228acb1b69c80186320103733d2f05a6f5b3d531312b1"
+            }
+          ],
+          "pattern": "app/helpers/camaleon_cms/uploader_helper.rb",
+          "anchor": "def upload_file"
+        },
+        {
+          "label_id": "GHSL-2024-185",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/views/camaleon_cms/admin/settings/custom_fields/_render.html.erb",
+              "line": 23,
+              "file_sha256": "27f0df9edfe39ae1cf8e9846d5bf8c5627907c80e41dd0b041377c237a5417c5"
+            }
+          ],
+          "pattern": "app/views/camaleon_cms/admin/settings/custom_fields/_render.html.erb",
+          "anchor": "eval(field.name)"
+        },
+        {
+          "label_id": "GHSL-2024-186",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "app/uploaders/camaleon_cms_local_uploader.rb",
+              "line": 116,
+              "file_sha256": "782bcbd9252447ae322852e206c40969469972e42dfcf99b9176802b743ba858"
+            }
+          ],
+          "pattern": "app/uploaders/camaleon_cms_local_uploader.rb",
+          "anchor": "def delete_file"
+        }
+      ]
+    },
+    {
+      "case_id": "t005",
+      "repository": "RVC-Project/Retrieval-based-Voice-Conversion-WebUI",
+      "commit": "9f2f0559e6932c10c48642d404e7d2e771d9db43",
+      "tree_sha256": "8bc526a0e7f931d33823f1e1178a9fcabf0860d8b3f71052f3a47d37f6faa124",
+      "labels": [
+        {
+          "label_id": "GHSL-2025-012",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "infer-web.py",
+              "line": 215,
+              "file_sha256": "ce5e66be17c86895559d14caee96a36a8ecedbdf6791345b06c3307201c153b8"
+            }
+          ],
+          "pattern": "infer-web.py",
+          "anchor": "def preprocess_dataset("
+        },
+        {
+          "label_id": "GHSL-2025-013",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "infer-web.py",
+              "line": 256,
+              "file_sha256": "ce5e66be17c86895559d14caee96a36a8ecedbdf6791345b06c3307201c153b8"
+            }
+          ],
+          "pattern": "infer-web.py",
+          "anchor": "def extract_f0_feature("
+        },
+        {
+          "label_id": "GHSL-2025-014",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "infer-web.py",
+              "line": 457,
+              "file_sha256": "ce5e66be17c86895559d14caee96a36a8ecedbdf6791345b06c3307201c153b8"
+            }
+          ],
+          "pattern": "infer-web.py",
+          "anchor": "def click_train("
+        },
+        {
+          "label_id": "GHSL-2025-015",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "infer-web.py",
+              "line": 754,
+              "file_sha256": "ce5e66be17c86895559d14caee96a36a8ecedbdf6791345b06c3307201c153b8"
+            }
+          ],
+          "pattern": "infer-web.py",
+          "anchor": "def change_info_("
+        },
+        {
+          "label_id": "GHSL-2025-016",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "infer/lib/train/process_ckpt.py",
+              "line": 51,
+              "file_sha256": "3c8725e22401bac7792d6fec77c78ece302e2b8fb0fef334a69071702bb62e7c"
+            }
+          ],
+          "pattern": "infer/lib/train/process_ckpt.py",
+          "anchor": "def show_info("
+        },
+        {
+          "label_id": "GHSL-2025-017",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "infer/lib/train/process_ckpt.py",
+              "line": 64,
+              "file_sha256": "3c8725e22401bac7792d6fec77c78ece302e2b8fb0fef334a69071702bb62e7c"
+            }
+          ],
+          "pattern": "infer/lib/train/process_ckpt.py",
+          "anchor": "def extract_small_model("
+        },
+        {
+          "label_id": "GHSL-2025-018",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "infer/lib/train/process_ckpt.py",
+              "line": 194,
+              "file_sha256": "3c8725e22401bac7792d6fec77c78ece302e2b8fb0fef334a69071702bb62e7c"
+            }
+          ],
+          "pattern": "infer/lib/train/process_ckpt.py",
+          "anchor": "def change_info("
+        },
+        {
+          "label_id": "GHSL-2025-019",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "infer/lib/train/process_ckpt.py",
+              "line": 206,
+              "file_sha256": "3c8725e22401bac7792d6fec77c78ece302e2b8fb0fef334a69071702bb62e7c"
+            }
+          ],
+          "pattern": "infer/lib/train/process_ckpt.py",
+          "anchor": "def merge("
+        },
+        {
+          "label_id": "GHSL-2025-020",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "infer/modules/onnx/export.py",
+              "line": 7,
+              "file_sha256": "b08624bce7f973ea9c3ba5f518e543d9bd92f25e50a96f15efc952446663307e"
+            }
+          ],
+          "pattern": "infer/modules/onnx/export.py",
+          "anchor": "torch.load(ModelPath"
+        },
+        {
+          "label_id": "GHSL-2025-021",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "infer/modules/uvr5/preprocess.py",
+              "line": 18,
+              "file_sha256": "0a99f06d600f401282646f38402d88e12aab3b98b86af67f603f8995cf87f722"
+            }
+          ],
+          "pattern": "infer/modules/uvr5/preprocess.py",
+          "anchor": "class AudioPre:"
+        },
+        {
+          "label_id": "GHSL-2025-022",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "infer/modules/uvr5/preprocess.py",
+              "line": 182,
+              "file_sha256": "0a99f06d600f401282646f38402d88e12aab3b98b86af67f603f8995cf87f722"
+            }
+          ],
+          "pattern": "infer/modules/uvr5/preprocess.py",
+          "anchor": "class AudioPreDeEcho:"
+        }
+      ]
+    },
+    {
+      "case_id": "t006",
+      "repository": "RVC-Boss/GPT-SoVITS",
+      "commit": "4fd57b0ea776d396f202e13be180b4c02e4dd957",
+      "tree_sha256": "077ebab4fc8e41321408b561e9e7b72950cab659175e8f693e9fd0b235284b78",
+      "labels": [
+        {
+          "label_id": "GHSL-2025-045",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "webui.py",
+              "line": 486,
+              "file_sha256": "a96ec061f256c691b5dd55ad430f601482d810021007c3a4cdc880372c59188f"
+            }
+          ],
+          "pattern": "webui.py",
+          "anchor": "def open_slice("
+        },
+        {
+          "label_id": "GHSL-2025-046",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "webui.py",
+              "line": 356,
+              "file_sha256": "a96ec061f256c691b5dd55ad430f601482d810021007c3a4cdc880372c59188f"
+            }
+          ],
+          "pattern": "webui.py",
+          "anchor": "def open_denoise("
+        },
+        {
+          "label_id": "GHSL-2025-047",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "webui.py",
+              "line": 324,
+              "file_sha256": "a96ec061f256c691b5dd55ad430f601482d810021007c3a4cdc880372c59188f"
+            }
+          ],
+          "pattern": "webui.py",
+          "anchor": "def open_asr("
+        },
+        {
+          "label_id": "GHSL-2025-048",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "webui.py",
+              "line": 267,
+              "file_sha256": "a96ec061f256c691b5dd55ad430f601482d810021007c3a4cdc880372c59188f"
+            }
+          ],
+          "pattern": "webui.py",
+          "anchor": "def change_label("
+        },
+        {
+          "label_id": "GHSL-2025-049",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "tools/uvr5/vr.py",
+              "line": 17,
+              "file_sha256": "26b69db5881deb96c6863d4d46a7e7ccc767737592f0eeb921e46d840d772a17"
+            }
+          ],
+          "pattern": "tools/uvr5/vr.py",
+          "anchor": "class AudioPre:"
+        },
+        {
+          "label_id": "GHSL-2025-050",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "tools/uvr5/vr.py",
+              "line": 200,
+              "file_sha256": "26b69db5881deb96c6863d4d46a7e7ccc767737592f0eeb921e46d840d772a17"
+            }
+          ],
+          "pattern": "tools/uvr5/vr.py",
+          "anchor": "class AudioPreDeEcho:"
+        },
+        {
+          "label_id": "GHSL-2025-051",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "tools/uvr5/bsroformer.py",
+              "line": 14,
+              "file_sha256": "6dac53dc03611ee44bf74387f353cf00744ecb2e956ee32f855c3f64bc796994"
+            }
+          ],
+          "pattern": "tools/uvr5/bsroformer.py",
+          "anchor": "class Roformer_Loader"
+        },
+        {
+          "label_id": "GHSL-2025-052",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "GPT_SoVITS/inference_webui.py",
+              "line": 307,
+              "file_sha256": "dcd89cf27f7923e4e9696b00f135abb9f7a7bbd433f03e5fcb0cb72d1785c23a"
+            }
+          ],
+          "pattern": "GPT_SoVITS/inference_webui.py",
+          "anchor": "def change_gpt_weights("
+        },
+        {
+          "label_id": "GHSL-2025-053",
+          "status": "anchor_found",
+          "matches": [
+            {
+              "path": "GPT_SoVITS/process_ckpt.py",
+              "line": 97,
+              "file_sha256": "5d410bfe49411ce31e57369437504a49761e43a192a93a1b9c62ff9c0fbc8270"
+            }
+          ],
+          "pattern": "GPT_SoVITS/process_ckpt.py",
+          "anchor": "def load_sovits_new("
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,868 @@
+{
+  "catalog_sha256": "d637d699d3c656bc3e4511c5a70472d5c4bad2346d5bc07a46755bc2e01be9ee",
+  "catalog": {
+    "schema_version": 1,
+    "name": "ghsl-six-repos-v1",
+    "cases": [
+      {
+        "id": "t001",
+        "repository": "FlowiseAI/Flowise",
+        "ref": "flowise@1.4.3",
+        "mode": "snapshot",
+        "split": "dev",
+        "leakage_group": "flowise",
+        "validation": "advisory_only",
+        "labels": [
+          {
+            "id": "GHSL-2023-232",
+            "title": "Arbitrary file read",
+            "mechanism": "The openai-assistants-file endpoint joins an untrusted fileName to its storage directory without enforcing containment, enabling reads outside that directory.",
+            "location_hint": "packages/server/src/index.ts: /api/v1/openai-assistants-file",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "The openai-assistants-file endpoint joins an untrusted fileName to its storage directory without enforcing containment, enabling reads outside that directory."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2023-232_GHSL-2023-234_Flowise/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2023-245",
+            "title": "Reflected XSS",
+            "mechanism": "The /api/v1/chatflows/:id endpoint reflects an attacker-controlled identifier into an HTML error response without encoding, allowing script execution under the report's configuration assumptions.",
+            "location_hint": "packages/server/src/index.ts: /api/v1/chatflows/:id",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "The /api/v1/chatflows/:id endpoint reflects an attacker-controlled identifier into an HTML error response without encoding, allowing script execution under the report's configuration assumptions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2023-232_GHSL-2023-234_Flowise/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2023-246",
+            "title": "Reflected XSS",
+            "mechanism": "The /api/v1/public-chatflows/:id endpoint reflects an attacker-controlled identifier into an HTML error response without encoding, allowing script execution under the report's configuration assumptions.",
+            "location_hint": "packages/server/src/index.ts: /api/v1/public-chatflows/:id",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "The /api/v1/public-chatflows/:id endpoint reflects an attacker-controlled identifier into an HTML error response without encoding, allowing script execution under the report's configuration assumptions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2023-232_GHSL-2023-234_Flowise/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2023-247",
+            "title": "Reflected XSS",
+            "mechanism": "The /api/v1/chatflows-streaming/:id endpoint reflects an attacker-controlled identifier into an HTML error response without encoding, allowing script execution under the report's configuration assumptions.",
+            "location_hint": "packages/server/src/index.ts: /api/v1/chatflows-streaming/:id",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "The /api/v1/chatflows-streaming/:id endpoint reflects an attacker-controlled identifier into an HTML error response without encoding, allowing script execution under the report's configuration assumptions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2023-232_GHSL-2023-234_Flowise/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2023-248",
+            "title": "Reflected XSS",
+            "mechanism": "The /api/v1/credentials/:id endpoint reflects an attacker-controlled identifier into an HTML error response without encoding, allowing script execution under the report's configuration assumptions.",
+            "location_hint": "packages/server/src/index.ts: /api/v1/credentials/:id",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "The /api/v1/credentials/:id endpoint reflects an attacker-controlled identifier into an HTML error response without encoding, allowing script execution under the report's configuration assumptions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2023-232_GHSL-2023-234_Flowise/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2023-234",
+            "title": "CORS misconfiguration",
+            "mechanism": "An arbitrary website can read responses from an unauthenticated Flowise instance under the report's deployment assumptions because unrestricted CORS allows cross-origin reads; wildcard CORS alone is not sufficient evidence.",
+            "location_hint": "packages/server/src/index.ts: cors middleware",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An arbitrary website can read responses from an unauthenticated Flowise instance under the report's deployment assumptions because unrestricted CORS allows cross-origin reads; wildcard CORS alone is not sufficient evidence."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2023-232_GHSL-2023-234_Flowise/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          }
+        ],
+        "notes": "The report does not establish a complete fixed revision. Six GHSL findings, not six independent mechanisms."
+      },
+      {
+        "id": "t002",
+        "repository": "datahub-project/datahub",
+        "ref": "v0.8.44",
+        "mode": "snapshot",
+        "split": "holdout",
+        "leakage_group": "datahub",
+        "validation": "advisory_only",
+        "labels": [
+          {
+            "id": "GHSL-2022-076",
+            "title": "Proxy SSRF/XSS",
+            "mechanism": "Frontend proxy URI construction permits an attacker to change the destination host; the report also documents an XSS interpretation of this issue.",
+            "location_hint": "controllers.Application#proxy",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "Frontend proxy URI construction permits an attacker to change the destination host; the report also documents an XSS interpretation of this issue."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2022-076_GHSL-2022-083_DataHub/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2022-077",
+            "title": "Open redirect",
+            "mechanism": "An attacker-controlled redirect destination permits navigation to an untrusted site through the frontend.",
+            "location_hint": "frontend redirect handling",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An attacker-controlled redirect destination permits navigation to an untrusted site through the frontend."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2022-076_GHSL-2022-083_DataHub/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2022-078",
+            "title": "Missing JWT signature verification",
+            "mechanism": "With metadata-service authentication enabled, the backend accepts JWT identity claims without checking their cryptographic signature, enabling impersonation.",
+            "location_hint": "GMS JWT authentication",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "With metadata-service authentication enabled, the backend accepts JWT identity claims without checking their cryptographic signature, enabling impersonation."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2022-076_GHSL-2022-083_DataHub/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2022-079",
+            "title": "System account impersonation",
+            "mechanism": "In the default unauthenticated metadata-service configuration, NoOpAuthenticator trusts the caller's X-DataHub-Actor header for authorization identity.",
+            "location_hint": "NoOpAuthenticator",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "In the default unauthenticated metadata-service configuration, NoOpAuthenticator trusts the caller's X-DataHub-Actor header for authorization identity."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2022-076_GHSL-2022-083_DataHub/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2022-080",
+            "title": "JSON injection",
+            "mechanism": "Frontend string-formatted JSON incorporates attacker-controlled values, allowing injected fields to shadow trusted fields.",
+            "location_hint": "frontend JSON construction",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "Frontend string-formatted JSON incorporates attacker-controlled values, allowing injected fields to shadow trusted fields."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2022-076_GHSL-2022-083_DataHub/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2022-081",
+            "title": "Authentication fails open",
+            "mechanism": "An erroneous JAAS configuration causes authentication to accept arbitrary credentials rather than rejecting login.",
+            "location_hint": "JAAS authentication initialization",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An erroneous JAAS configuration causes authentication to accept arbitrary credentials rather than rejecting login."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2022-076_GHSL-2022-083_DataHub/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2022-082",
+            "title": "Insecure secret encryption",
+            "mechanism": "SecretUtils and SecretService encrypt secrets with AES ECB, revealing repeated-block structure; explain the confidentiality consequence rather than claiming arbitrary decryption.",
+            "location_hint": "SecretUtils / SecretService",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "SecretUtils and SecretService encrypt secrets with AES ECB, revealing repeated-block structure; explain the confidentiality consequence rather than claiming arbitrary decryption."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2022-076_GHSL-2022-083_DataHub/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2022-083",
+            "title": "Session survives logout",
+            "mechanism": "Logout clears the browser cookie without invalidating its server acceptance, allowing a retained session cookie to remain usable.",
+            "location_hint": "frontend logout and session verification",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "Logout clears the browser cookie without invalidating its server acceptance, allowing a retained session cookie to remain usable."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2022-076_GHSL-2022-083_DataHub/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2022-086",
+            "title": "Untrusted deserialization",
+            "mechanism": "The affected pac4j dependency deserializes attacker-controlled nonce data, creating the reported untrusted deserialization path.",
+            "location_hint": "pac4j nonce handling and dependency version",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "The affected pac4j dependency deserializes attacker-controlled nonce data, creating the reported untrusted deserialization path."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2022-076_GHSL-2022-083_DataHub/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2022-087",
+            "title": "Cypher injection",
+            "mechanism": "Attacker-controlled data reaches Cypher query construction in Neo4JGraphService through API endpoints, enabling unintended graph queries.",
+            "location_hint": "Neo4JGraphService",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "Attacker-controlled data reaches Cypher query construction in Neo4JGraphService through API endpoints, enabling unintended graph queries."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2022-076_GHSL-2022-083_DataHub/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          }
+        ],
+        "notes": "Ten numbered issues in the report body; the title's range is incomplete. Report says fixes were published with v0.8.45; per-issue fix mapping is not yet verified."
+      },
+      {
+        "id": "t003",
+        "repository": "MarkUsProject/Markus",
+        "ref": "v2.4.6",
+        "mode": "snapshot",
+        "split": "holdout",
+        "leakage_group": "markus",
+        "validation": "advisory_only",
+        "labels": [
+          {
+            "id": "GHSL-2024-060",
+            "title": "Arbitrary file write",
+            "mechanism": "Untrusted path data from SubmissionsController#update_files reaches filesystem writes outside the intended repository directory; arbitrary Ruby writes can lead to delayed code execution under the documented permissions.",
+            "location_hint": "SubmissionsController#update_files",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "Untrusted path data from SubmissionsController#update_files reaches filesystem writes outside the intended repository directory; arbitrary Ruby writes can lead to delayed code execution under the documented permissions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-060_GHSL-2024-068_MarkUs/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2024-062",
+            "title": "Arbitrary file write",
+            "mechanism": "Untrusted path data from AutomatedTestsController reaches filesystem writes outside the intended repository directory; arbitrary Ruby writes can lead to delayed code execution under the documented permissions.",
+            "location_hint": "AutomatedTestsController",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "Untrusted path data from AutomatedTestsController reaches filesystem writes outside the intended repository directory; arbitrary Ruby writes can lead to delayed code execution under the documented permissions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-060_GHSL-2024-068_MarkUs/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2024-063",
+            "title": "Arbitrary file write",
+            "mechanism": "Untrusted path data from StarterFileGroupsController reaches filesystem writes outside the intended repository directory; arbitrary Ruby writes can lead to delayed code execution under the documented permissions.",
+            "location_hint": "StarterFileGroupsController",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "Untrusted path data from StarterFileGroupsController reaches filesystem writes outside the intended repository directory; arbitrary Ruby writes can lead to delayed code execution under the documented permissions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-060_GHSL-2024-068_MarkUs/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2024-064",
+            "title": "Arbitrary file write",
+            "mechanism": "Untrusted path data from StarterFileGroupsController API reaches filesystem writes outside the intended repository directory; arbitrary Ruby writes can lead to delayed code execution under the documented permissions.",
+            "location_hint": "StarterFileGroupsController API",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "Untrusted path data from StarterFileGroupsController API reaches filesystem writes outside the intended repository directory; arbitrary Ruby writes can lead to delayed code execution under the documented permissions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-060_GHSL-2024-068_MarkUs/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2024-065",
+            "title": "Path traversal / file read",
+            "mechanism": "An attacker-controlled path in AutomatedTestsController#download_file reaches a file download without effective containment, enabling unintended file reads under the documented account permissions.",
+            "location_hint": "AutomatedTestsController#download_file",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An attacker-controlled path in AutomatedTestsController#download_file reaches a file download without effective containment, enabling unintended file reads under the documented account permissions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-060_GHSL-2024-068_MarkUs/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2024-066",
+            "title": "Path traversal / file read",
+            "mechanism": "An attacker-controlled path in ExamTemplatesController#download_error_file reaches a file download without effective containment, enabling unintended file reads under the documented account permissions.",
+            "location_hint": "ExamTemplatesController#download_error_file",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An attacker-controlled path in ExamTemplatesController#download_error_file reaches a file download without effective containment, enabling unintended file reads under the documented account permissions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-060_GHSL-2024-068_MarkUs/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2024-067",
+            "title": "Path traversal / file read",
+            "mechanism": "An attacker-controlled path in ExamTemplatesController#download_generate reaches a file download without effective containment, enabling unintended file reads under the documented account permissions.",
+            "location_hint": "ExamTemplatesController#download_generate",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An attacker-controlled path in ExamTemplatesController#download_generate reaches a file download without effective containment, enabling unintended file reads under the documented account permissions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-060_GHSL-2024-068_MarkUs/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2024-068",
+            "title": "Path traversal / file read",
+            "mechanism": "An attacker-controlled path in StarterFileGroupsController#download reaches a file download without effective containment, enabling unintended file reads under the documented account permissions.",
+            "location_hint": "StarterFileGroupsController#download",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An attacker-controlled path in StarterFileGroupsController#download reaches a file download without effective containment, enabling unintended file reads under the documented account permissions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-060_GHSL-2024-068_MarkUs/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          }
+        ],
+        "notes": "GHSL-2024-061 was withdrawn as a duplicate sink and is excluded."
+      },
+      {
+        "id": "t004",
+        "repository": "owen2345/camaleon-cms",
+        "ref": "2.8.0",
+        "mode": "snapshot",
+        "split": "dev",
+        "leakage_group": "camaleon",
+        "validation": "advisory_only",
+        "labels": [
+          {
+            "id": "GHSL-2024-182",
+            "title": "Arbitrary file write to RCE",
+            "mechanism": "An ordinary authenticated user's upload folder and format options reach the local uploader without containment, enabling arbitrary file writes and delayed Ruby execution where filesystem permissions permit.",
+            "location_hint": "MediaController#upload -> CamaleonCmsLocalUploader#add_file",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An ordinary authenticated user's upload folder and format options reach the local uploader without containment, enabling arbitrary file writes and delayed Ruby execution where filesystem permissions permit."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-182_GHSL-2024-186_Camaleon_CMS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2024-183",
+            "title": "Path traversal",
+            "mechanism": "An ordinary authenticated user's file parameter reaches send_file through download_private_file without enforcing the private-media root.",
+            "location_hint": "MediaController#download_private_file",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An ordinary authenticated user's file parameter reaches send_file through download_private_file without enforcing the private-media root."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-182_GHSL-2024-186_Camaleon_CMS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2024-184",
+            "title": "Stored XSS",
+            "mechanism": "An ordinary user can upload active SVG or HTML content served under the application's origin, enabling script execution when another user views it.",
+            "location_hint": "MediaController upload and media serving",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An ordinary user can upload active SVG or HTML content served under the application's origin, enabling script execution when another user views it."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-182_GHSL-2024-186_Camaleon_CMS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2024-185",
+            "title": "Code injection",
+            "mechanism": "An administrator can enable label_eval and supply custom field text evaluated as Ruby; the report chains this with account takeover, so administrator prerequisites must be stated.",
+            "location_hint": "custom field rendering: label_eval / eval",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An administrator can enable label_eval and supply custom field text evaluated as Ruby; the report chains this with account takeover, so administrator prerequisites must be stated."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-182_GHSL-2024-186_Camaleon_CMS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2024-186",
+            "title": "Arbitrary file deletion",
+            "mechanism": "An administrator-controlled folder parameter reaches the local uploader deletion operation without containment; do not describe this as an unauthenticated deletion.",
+            "location_hint": "MediaController#actions -> CamaleonCmsLocalUploader#delete_file",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "An administrator-controlled folder parameter reaches the local uploader deletion operation without containment; do not describe this as an unauthenticated deletion."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2024-182_GHSL-2024-186_Camaleon_CMS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          }
+        ],
+        "notes": "Report identifies 2.8.1 as containing fixes; individual fix commits and safe controls remain unverified."
+      },
+      {
+        "id": "t005",
+        "repository": "RVC-Project/Retrieval-based-Voice-Conversion-WebUI",
+        "ref": "2.2.231006",
+        "mode": "snapshot",
+        "split": "dev",
+        "leakage_group": "voice-conversion",
+        "validation": "advisory_only",
+        "labels": [
+          {
+            "id": "GHSL-2025-012",
+            "title": "Command injection",
+            "mechanism": "User-supplied UI parameters reach shell command construction in infer-web.py: preprocess_dataset, permitting command execution when an untrusted caller can invoke the UI.",
+            "location_hint": "infer-web.py: preprocess_dataset",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "User-supplied UI parameters reach shell command construction in infer-web.py: preprocess_dataset, permitting command execution when an untrusted caller can invoke the UI."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-012_GHSL-2025-022_Retrieval-based-Voice-Conversion-WebUI/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-013",
+            "title": "Command injection",
+            "mechanism": "User-supplied UI parameters reach shell command construction in infer-web.py: extract_f0_feature, permitting command execution when an untrusted caller can invoke the UI.",
+            "location_hint": "infer-web.py: extract_f0_feature",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "User-supplied UI parameters reach shell command construction in infer-web.py: extract_f0_feature, permitting command execution when an untrusted caller can invoke the UI."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-012_GHSL-2025-022_Retrieval-based-Voice-Conversion-WebUI/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-014",
+            "title": "Command injection",
+            "mechanism": "User-supplied UI parameters reach shell command construction in infer-web.py: click_train, permitting command execution when an untrusted caller can invoke the UI.",
+            "location_hint": "infer-web.py: click_train",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "User-supplied UI parameters reach shell command construction in infer-web.py: click_train, permitting command execution when an untrusted caller can invoke the UI."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-012_GHSL-2025-022_Retrieval-based-Voice-Conversion-WebUI/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-015",
+            "title": "Code injection",
+            "mechanism": "A user-controlled checkpoint path selects a train.log file whose contents are passed to eval; establish control of that file's content before claiming code execution.",
+            "location_hint": "infer-web.py: change_info_",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "A user-controlled checkpoint path selects a train.log file whose contents are passed to eval; establish control of that file's content before claiming code execution."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-012_GHSL-2025-022_Retrieval-based-Voice-Conversion-WebUI/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-016",
+            "title": "Unsafe model deserialization",
+            "mechanism": "A user-controlled model path reaches unsafe torch.load in process_ckpt.py: show_info; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions.",
+            "location_hint": "process_ckpt.py: show_info",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "A user-controlled model path reaches unsafe torch.load in process_ckpt.py: show_info; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-012_GHSL-2025-022_Retrieval-based-Voice-Conversion-WebUI/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-017",
+            "title": "Unsafe model deserialization",
+            "mechanism": "A user-controlled model path reaches unsafe torch.load in process_ckpt.py: extract_small_model; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions.",
+            "location_hint": "process_ckpt.py: extract_small_model",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "A user-controlled model path reaches unsafe torch.load in process_ckpt.py: extract_small_model; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-012_GHSL-2025-022_Retrieval-based-Voice-Conversion-WebUI/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-018",
+            "title": "Unsafe model deserialization",
+            "mechanism": "A user-controlled model path reaches unsafe torch.load in process_ckpt.py: change_info; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions.",
+            "location_hint": "process_ckpt.py: change_info",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "A user-controlled model path reaches unsafe torch.load in process_ckpt.py: change_info; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-012_GHSL-2025-022_Retrieval-based-Voice-Conversion-WebUI/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-019",
+            "title": "Unsafe model deserialization",
+            "mechanism": "A user-controlled model path reaches unsafe torch.load in process_ckpt.py: merge; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions.",
+            "location_hint": "process_ckpt.py: merge",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "A user-controlled model path reaches unsafe torch.load in process_ckpt.py: merge; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-012_GHSL-2025-022_Retrieval-based-Voice-Conversion-WebUI/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-020",
+            "title": "Unsafe model deserialization",
+            "mechanism": "A user-controlled model path reaches unsafe torch.load in export.py: export_onnx; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions.",
+            "location_hint": "export.py: export_onnx",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "A user-controlled model path reaches unsafe torch.load in export.py: export_onnx; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-012_GHSL-2025-022_Retrieval-based-Voice-Conversion-WebUI/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-021",
+            "title": "Unsafe model deserialization",
+            "mechanism": "A user-controlled model path reaches unsafe torch.load in vr.py: AudioPre; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions.",
+            "location_hint": "vr.py: AudioPre",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "A user-controlled model path reaches unsafe torch.load in vr.py: AudioPre; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-012_GHSL-2025-022_Retrieval-based-Voice-Conversion-WebUI/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-022",
+            "title": "Unsafe model deserialization",
+            "mechanism": "A user-controlled model path reaches unsafe torch.load in vr.py: AudioPreDeEcho; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions.",
+            "location_hint": "vr.py: AudioPreDeEcho",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "A user-controlled model path reaches unsafe torch.load in vr.py: AudioPreDeEcho; establish that an attacker can supply the serialized artifact and state the applicable runtime assumptions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-012_GHSL-2025-022_Retrieval-based-Voice-Conversion-WebUI/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          }
+        ],
+        "notes": "Report does not identify a complete fixed revision. Shares model-loading code with GPT-SoVITS: keep in the same split."
+      },
+      {
+        "id": "t006",
+        "repository": "RVC-Boss/GPT-SoVITS",
+        "ref": "20250228v3",
+        "mode": "snapshot",
+        "split": "dev",
+        "leakage_group": "voice-conversion",
+        "validation": "advisory_only",
+        "labels": [
+          {
+            "id": "GHSL-2025-045",
+            "title": "Command injection",
+            "mechanism": "User-supplied paths or parameters flow into shell=True command construction in webui.py: open_slice, allowing command execution when an untrusted user can invoke the UI.",
+            "location_hint": "webui.py: open_slice",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "User-supplied paths or parameters flow into shell=True command construction in webui.py: open_slice, allowing command execution when an untrusted user can invoke the UI."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-045_GHSL-2025-048_RVC-Boss_GPT-SoVITS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-046",
+            "title": "Command injection",
+            "mechanism": "User-supplied paths or parameters flow into shell=True command construction in webui.py: open_denoise, allowing command execution when an untrusted user can invoke the UI.",
+            "location_hint": "webui.py: open_denoise",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "User-supplied paths or parameters flow into shell=True command construction in webui.py: open_denoise, allowing command execution when an untrusted user can invoke the UI."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-045_GHSL-2025-048_RVC-Boss_GPT-SoVITS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-047",
+            "title": "Command injection",
+            "mechanism": "User-supplied paths or parameters flow into shell=True command construction in webui.py: open_asr, allowing command execution when an untrusted user can invoke the UI.",
+            "location_hint": "webui.py: open_asr",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "User-supplied paths or parameters flow into shell=True command construction in webui.py: open_asr, allowing command execution when an untrusted user can invoke the UI."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-045_GHSL-2025-048_RVC-Boss_GPT-SoVITS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-048",
+            "title": "Command injection",
+            "mechanism": "User-supplied paths or parameters flow into shell=True command construction in webui.py: change_label, allowing command execution when an untrusted user can invoke the UI.",
+            "location_hint": "webui.py: change_label",
+            "evidence_required": [
+              "Identify the attacker-controlled input or capability and relevant preconditions.",
+              "Trace that input to the affected operation using concrete repository locations.",
+              "Explain the absent or ineffective defense and the resulting security consequence.",
+              "User-supplied paths or parameters flow into shell=True command construction in webui.py: change_label, allowing command execution when an untrusted user can invoke the UI."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-045_GHSL-2025-048_RVC-Boss_GPT-SoVITS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-049",
+            "title": "Unsafe model deserialization",
+            "mechanism": "An attacker-supplied model artifact reaches unsafe torch.load through a user-controlled model path; establish artifact control and the runtime's deserialization behavior.",
+            "location_hint": "vr.py: AudioPre",
+            "evidence_required": [
+              "Establish attacker control of the model artifact.",
+              "Trace the artifact to the specific unsafe deserialization call.",
+              "Explain execution consequences and runtime preconditions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-049_GHSL-2025-053_RVC-Boss_GPT-SoVITS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-050",
+            "title": "Unsafe model deserialization",
+            "mechanism": "An attacker-supplied model artifact reaches unsafe torch.load through a user-controlled model path; establish artifact control and the runtime's deserialization behavior.",
+            "location_hint": "vr.py: AudioPreDeEcho",
+            "evidence_required": [
+              "Establish attacker control of the model artifact.",
+              "Trace the artifact to the specific unsafe deserialization call.",
+              "Explain execution consequences and runtime preconditions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-049_GHSL-2025-053_RVC-Boss_GPT-SoVITS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-051",
+            "title": "Unsafe model deserialization",
+            "mechanism": "An attacker-supplied model artifact reaches unsafe torch.load through a user-controlled model path; establish artifact control and the runtime's deserialization behavior.",
+            "location_hint": "bsroformer.py: Roformer_Loader",
+            "evidence_required": [
+              "Establish attacker control of the model artifact.",
+              "Trace the artifact to the specific unsafe deserialization call.",
+              "Explain execution consequences and runtime preconditions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-049_GHSL-2025-053_RVC-Boss_GPT-SoVITS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-052",
+            "title": "Unsafe model deserialization",
+            "mechanism": "An attacker-supplied model artifact reaches unsafe torch.load through a user-controlled model path; establish artifact control and the runtime's deserialization behavior.",
+            "location_hint": "inference_webui.py: change_gpt_weights",
+            "evidence_required": [
+              "Establish attacker control of the model artifact.",
+              "Trace the artifact to the specific unsafe deserialization call.",
+              "Explain execution consequences and runtime preconditions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-049_GHSL-2025-053_RVC-Boss_GPT-SoVITS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          },
+          {
+            "id": "GHSL-2025-053",
+            "title": "Unsafe model deserialization",
+            "mechanism": "An attacker-supplied model artifact reaches unsafe torch.load through a user-controlled model path; establish artifact control and the runtime's deserialization behavior.",
+            "location_hint": "process_ckpt.py: load_sovits_new",
+            "evidence_required": [
+              "Establish attacker control of the model artifact.",
+              "Trace the artifact to the specific unsafe deserialization call.",
+              "Explain execution consequences and runtime preconditions."
+            ],
+            "source": "https://securitylab.github.com/advisories/GHSL-2025-049_GHSL-2025-053_RVC-Boss_GPT-SoVITS/",
+            "validation": "advisory_only",
+            "fix_commit": null,
+            "introducing_commit": null
+          }
+        ],
+        "notes": "Report does not establish a complete fixed revision. Model deserialization findings use a second report."
+      }
+    ],
+    "status": "snapshot_detection_seed",
+    "label_provenance": "Manually paraphrased from seven public GitHub Security Lab reports. Not independently exploit-validated.",
+    "limitations": [
+      "Positive-only snapshot tasks do not measure PR introduction attribution or false-positive rate.",
+      "Public advisory labels are incomplete: unmatched findings require adjudication.",
+      "Refs must be resolved to immutable commits by prepare before running.",
+      "Development and held-out groups were selected before any agent run; no performance results exist."
+    ]
+  }
+}

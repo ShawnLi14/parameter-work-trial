@@ -1,0 +1,29 @@
+{
+  "catalog_sha256": "d44d77691d89af751a64b7819f5eca8d20e35672586c4374550792a4b36aa52b",
+  "scenarios": [
+    {
+      "repository": "RVC-Project/Retrieval-based-Voice-Conversion-WebUI",
+      "commit": "9f2f0559e6932c10c48642d404e7d2e771d9db43",
+      "target": "GHSL-2025-015",
+      "validation": {
+        "level": "isolated_function_replay",
+        "original_marker_written": true,
+        "repaired_marker_written": false,
+        "normal_behavior_preserved": true,
+        "limitations": "Proves code execution from controlled train.log content; does not establish remote upload/reachability in a deployed application."
+      }
+    },
+    {
+      "repository": "RVC-Boss/GPT-SoVITS",
+      "commit": "4fd57b0ea776d396f202e13be180b4c02e4dd957",
+      "target": "GHSL-2025-048",
+      "validation": {
+        "level": "isolated_function_process_boundary",
+        "original_shell": true,
+        "repaired_shell": false,
+        "argument_preservation_checked": true,
+        "limitations": "Popen is intercepted; no actual shell exploit, UI exposure, model stack, or downstream script execution is tested. Existence checking is stubbed; clean_path uses upstream implementation."
+      }
+    }
+  ]
+}

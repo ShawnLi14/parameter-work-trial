@@ -11,6 +11,26 @@ def grade_template(results):
         for f in row["output"]["findings"]]}
 
 
+def by_variant(cases, rows, decisions, hits, complete):
+    """Per-variant metrics: a single aggregate can hide weakness on hard controls."""
+    report = {}
+    for cid in rows:
+        variant = cases[cid].get("variant")
+        if variant:
+            row = report.setdefault(variant, {"cases": 0, "failed": 0, "targets": 0, "matched": 0, "alarm_cases": 0})
+            row["cases"] += 1
+            row["failed"] += rows[cid]["status"] != "ok"
+            row["targets"] += len(cases[cid]["labels"])
+            row["matched"] += sum(c == cid for c, _ in hits)
+            if not cases[cid]["labels"]:
+                row["alarm_cases"] += any(c == cid and d["decision"] == "false_positive" for (c, _), d in decisions.items())
+    for row in report.values():
+        row["recall"] = row["matched"] / row["targets"] if row["targets"] else None
+        usable = not row["targets"] and complete and not row["failed"]
+        row["alarm_rate"] = row["alarm_cases"] / row["cases"] if usable else None
+    return report
+
+
 def score(data, results, grades):
     if results["catalog_sha256"] != digest(data):
         raise ValueError("results belong to a different catalog")
@@ -33,10 +53,10 @@ def score(data, results, grades):
     decisions = {(d["case_id"], d["finding_id"]):d for d in grades["decisions"]}
     if len(decisions) != len(grades["decisions"]) or set(decisions) != expected:
         raise ValueError("each finding must have exactly one adjudication")
-    hits, false_positives, duplicates, unresolved = set(), 0, 0, 0
+    hits, false_positives, duplicates, unresolved, also_valid = set(), 0, 0, 0, 0
     for (cid, _), d in decisions.items():
         decision = d["decision"]
-        if decision not in {"match", "false_positive", "duplicate", "unresolved"}:
+        if decision not in {"match", "false_positive", "duplicate", "unresolved", "also_valid"}:
             raise ValueError("unknown adjudication decision")
         if decision != "unresolved" and (not grades.get("adjudicator", "").strip() or not d.get("rationale", "").strip()):
             raise ValueError("resolved decisions require adjudicator and rationale")
@@ -50,6 +70,11 @@ def score(data, results, grades):
                 hits.add((cid,lid))
             else:
                 duplicates += 1
+        elif decision == "also_valid":
+            # A correct finding this diff introduces beyond its labels: not a target hit, not an error.
+            if d.get("also_valid_id") not in {item["id"] for item in cases[cid].get("also_valid", [])}:
+                raise ValueError("also_valid requires an also_valid_id from the same case")
+            also_valid += 1
         elif decision == "false_positive":
             false_positives += 1
         else:
@@ -72,11 +97,13 @@ def score(data, results, grades):
             "target_count": total, "true_positives": tp, "false_negatives": total-tp,
             "adjudicated_false_positives": false_positives, "duplicates": duplicates,
             "unresolved_findings": unresolved, "target_recall": tp / total if total else None,
+            "also_valid_findings": also_valid,
             "precision": precision if complete else None,
             "f1": 2*tp/f1_denominator if complete and f1_denominator else None,
             "false_positive_rate": None,
             "negative_control_cases":len(controls), "negative_control_failures":control_failures,
             "negative_control_alarm_rate":len(alarm_cases)/len(controls) if controls and complete and not control_failures else None,
+            "by_variant": by_variant(cases, rows, decisions, hits, complete),
             "macro_case_recall": sum(sum(c==cid for c,_ in hits)/len(cases[cid]["labels"]) for cid in positive_cases)/len(positive_cases) if positive_cases else None,
             "notes": ["Recall is a lower bound while adjudication remains unresolved.",
                       "Global false-positive rate is not measured. PR controls test only whether the reviewed change introduces a security issue; unchanged vulnerabilities are excluded.",

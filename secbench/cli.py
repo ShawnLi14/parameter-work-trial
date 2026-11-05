@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 from .catalog import CATALOG, digest, load
-from .runner import prepare, read_json, run, task, write_json
+from .runner import checked_lock, prepare, read_json, remove_case, run, task, unpack_case, write_json
 from .scoring import grade_template, score
 
 
@@ -21,6 +21,15 @@ def main(argv=None):
     build_pr = sub.add_parser("build-pr-cases")
     build_pr.add_argument("--work",type=Path,default=Path(".bench"))
     build_pr.add_argument("--out",type=Path,default=Path(".bench/pr-v1"))
+    build_history = sub.add_parser("build-history-prs")
+    build_history.add_argument("--manifest",type=Path,default=Path("benchmarks/pr-v2/manifest.json"))
+    build_history.add_argument("--cache",type=Path,default=Path(".bench/pr-v2-cache"))
+    build_history.add_argument("--out",type=Path,default=Path(".bench/pr-v2"))
+    build_history.add_argument("--check-only",action="store_true",help="fetch and verify every entry without exporting trees")
+    unpack = sub.add_parser("unpack", help="unpack one on-demand PR case's trees, such as to mount them in a sandbox")
+    unpack.add_argument("--case", required=True)
+    unpack.add_argument("--work", type=Path, default=Path(".bench/pr-v2"))
+    unpack.add_argument("--remove", action="store_true", help="delete the case's unpacked trees instead")
     freeze = sub.add_parser("freeze")
     freeze.add_argument("--out", required=True)
     for name in ("prepare", "export", "run"):
@@ -57,6 +66,28 @@ def main(argv=None):
             from .pr_cases import build
             suite=build(data,args.work,args.out)
             print(f"Built {len(suite['cases'])} PR cases in {args.out}; validation scope: isolated functions.")
+        elif args.action == "build-history-prs":
+            from .pr_history import build, coverage, load_manifest
+            manifest=load_manifest(args.manifest)
+            covered=coverage(data,manifest)
+            suite=build(data,manifest,args.cache,args.out,args.check_only)
+            print(f"{'Checked' if args.check_only else 'Built'} {len(suite['cases'])} historical PR cases; validation scope: source review.")
+            print(f"Targets: {covered['covered']}/{covered['target_count']} covered, {len(covered['unusable'])} not used, {len(covered['unaccounted'])} unaccounted.")
+            if not args.check_only:
+                write_json(args.out/"coverage.json",covered)
+        elif args.action == "unpack":
+            case = next((c for c in data["cases"] if c["id"] == args.case), None)
+            if case is None:
+                raise ValueError("unknown case ID")
+            lock = checked_lock(data,case,args.work)
+            if not lock.get("on_demand"):
+                raise ValueError("this case is not stored on demand")
+            if args.remove:
+                remove_case(lock)
+                print(f"Removed {args.case}'s unpacked trees.")
+            else:
+                unpack_case(lock)
+                print(f"Unpacked {args.case}: {lock['source_dir']} and {lock['base_source_dir']}")
         elif args.action == "check-sources":
             from .source_checks import check_sources
             report = check_sources(data,args.work)

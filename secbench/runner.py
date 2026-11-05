@@ -1,13 +1,16 @@
+import contextlib
 import hashlib
 import io
 import json
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import subprocess
+import sys
 import time
 import zipfile
 
-from .catalog import digest
+from .catalog import HISTORICAL_CONSTRUCTIONS, digest
 
 
 def read_json(path):
@@ -21,7 +24,10 @@ def write_json(path, data):
 
 
 def git(*args):
-    result = subprocess.run(["git", "-c", "core.hooksPath=", *map(str, args)],
+    # Disable line-ending rewriting so snapshots and hashes do not depend on the
+    # host's system-level Git configuration.
+    result = subprocess.run(["git", "-c", "core.hooksPath=", "-c", "core.autocrlf=false",
+                             "-c", "core.eol=lf", *map(str, args)],
                             capture_output=True, timeout=300)
     if result.returncode:
         raise ValueError(result.stderr.decode("utf-8", errors="replace").strip())
@@ -39,6 +45,28 @@ def tree_hash(root):
             content_hash = hashlib.sha256(path.read_bytes()).digest()
             h.update(content_hash)
     return h.hexdigest()
+
+
+def export_tree(repo, commit, destination):
+    """Export a commit's tracked files without history; symlinks are skipped and reported."""
+    archive = git("-C", repo, "archive", "--format=zip", commit)
+    destination = Path(destination)
+    destination.mkdir(parents=True)
+    skipped = []
+    with zipfile.ZipFile(io.BytesIO(archive)) as z:
+        for member in z.infolist():
+            path = PurePosixPath(member.filename)
+            if path.is_absolute() or ".." in path.parts or "\\" in member.filename or ":" in member.filename:
+                raise ValueError("unsafe archive path")
+            if ((member.external_attr >> 16) & 0o170000) == 0o120000:
+                skipped.append(member.filename)
+                continue
+            if member.is_dir():
+                continue
+            target = destination.joinpath(*path.parts)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(z.read(member))
+    return archive, skipped
 
 
 def prepare(data, case, work, local=None):
@@ -66,22 +94,7 @@ def prepare(data, case, work, local=None):
     commit = git("-C", repo, "rev-parse", "--verify", ref + "^{commit}").decode().strip()
     if not re.fullmatch(r"[0-9a-f]{40,64}", commit):
         raise ValueError("invalid commit")
-    archive = git("-C", repo, "archive", "--format=zip", commit)
-    source.mkdir(parents=True)
-    skipped = []
-    with zipfile.ZipFile(io.BytesIO(archive)) as z:
-        for member in z.infolist():
-            path = PurePosixPath(member.filename)
-            if path.is_absolute() or ".." in path.parts or "\\" in member.filename or ":" in member.filename:
-                raise ValueError("unsafe archive path")
-            if ((member.external_attr >> 16) & 0o170000) == 0o120000:
-                skipped.append(member.filename)
-                continue
-            if member.is_dir():
-                continue
-            target = source.joinpath(*path.parts)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(z.read(member))
+    archive, skipped = export_tree(repo, commit, source)
     lock = {"case_id": case["id"], "repository": case["repository"],
             "requested_ref": case["ref"], "commit": commit,
             "catalog_sha256": digest(data), "tree_sha256": tree_hash(source),
@@ -91,12 +104,51 @@ def prepare(data, case, work, local=None):
     return lock
 
 
+def unpack_case(lock):
+    """Export an on-demand case's trees from its repository store, replacing any leftovers."""
+    remove_case(lock)
+    export_tree(lock["store"], lock["commit"], lock["source_dir"])
+    export_tree(lock["store"], lock["base_commit"], lock["base_source_dir"])
+
+
+def remove_case(lock):
+    for path in (lock["source_dir"], lock["base_source_dir"]):
+        try:
+            shutil.rmtree(path)
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            # A reviewer's child process can still hold a file; the next unpack retries.
+            print(f"secbench: could not remove {path}: {error}", file=sys.stderr)
+
+
+@contextlib.contextmanager
+def case_trees(lock):
+    """Hold an on-demand case's trees on disk only while it is being reviewed."""
+    if not lock.get("on_demand"):
+        yield
+        return
+    try:
+        unpack_case(lock)
+        yield
+    finally:
+        remove_case(lock)
+
+
 def checked_lock(data, case, work):
     lock = read_json(Path(work) / "locks" / (case["id"] + ".json"))
     expected = (Path(work).resolve() / "sources" / case["id"])
     if (lock["catalog_sha256"] != digest(data) or lock["case_id"] != case["id"]
             or Path(lock["source_dir"]).resolve() != expected):
         raise ValueError("Snapshot lock does not match this catalog/work directory")
+    if lock.get("on_demand"):
+        # A commit ID is itself a fingerprint of its contents, so the store needs no tree hash.
+        patch = Path(work).resolve() / "diffs" / (case["id"] + ".patch")
+        if hashlib.sha256(patch.read_bytes()).hexdigest() != lock["patch_sha256"]:
+            raise ValueError("PR diff has been modified")
+        for commit in (lock["commit"], lock["base_commit"]):
+            git("-C", lock["store"], "cat-file", "-e", commit + "^{commit}")
+        return lock
     if not expected.is_dir() or tree_hash(expected) != lock["tree_sha256"]:
         raise ValueError("Snapshot is missing or modified; use a fresh --work directory")
     if case["mode"] == "pr":
@@ -119,6 +171,11 @@ def task(data, case, work):
                 '{"findings":[{"title":"...","description":"...","path":"relative/file",'
                 '"line":1,"evidence":["relative/file:line and relevant fact"]}]}. '
                 "Return an empty findings list if no vulnerability is established."}
+    if case.get("construction") in HISTORICAL_CONSTRUCTIONS:
+        # A real upstream SHA can be looked up to reveal the PR and its discussion.
+        del request["commit"]
+        request["instructions"] = ("Report each distinct vulnerability as its own finding, even if "
+            "several share a pattern; one finding is credited to at most one issue. " + request["instructions"])
     if case["mode"] == "pr":
         request["base_source_dir"]=lock["base_source_dir"]
         request["diff"]=(Path(work)/"diffs"/(case["id"]+".patch")).read_text(encoding="utf-8")
@@ -155,21 +212,28 @@ def run(data, cases, work, command, model, timeout):
     results = {"schema_version": 1, "catalog_sha256": digest(data),
                "model": model, "command": command, "cases": []}
     for case in cases:
+        lock = checked_lock(data, case, work)
         request = task(data, case, work)
         start = time.monotonic()
-        row = {"case_id": case["id"], "commit": request["commit"],
-               "head_tree_sha256":tree_hash(request["source_dir"])}
+        row = {"case_id": case["id"], "commit": lock["commit"]}
         try:
-            p = subprocess.run(command, input=json.dumps(request), capture_output=True,
-                               text=True, encoding="utf-8", cwd=request["source_dir"],
-                               timeout=timeout, shell=False)
-            if p.returncode:
-                raise ValueError(f"agent exit {p.returncode}: {p.stderr[-2000:]}")
-            checked_lock(data, case, work)
-            row.update(status="ok", output=validate_output(json.loads(p.stdout)))
-        except (ValueError, OSError, subprocess.TimeoutExpired) as error:
+            with case_trees(lock):
+                row["head_tree_sha256"] = tree_hash(request["source_dir"])
+                if lock.get("on_demand"):
+                    row["base_tree_sha256"] = tree_hash(request["base_source_dir"])
+                p = subprocess.run(command, input=json.dumps(request), capture_output=True,
+                                   text=True, encoding="utf-8", cwd=request["source_dir"],
+                                   timeout=timeout, shell=False)
+                if p.returncode:
+                    raise ValueError(f"agent exit {p.returncode}: {p.stderr[-2000:]}")
+                checked_lock(data, case, work)
+                if lock.get("on_demand") and (tree_hash(request["source_dir"]) != row["head_tree_sha256"]
+                                              or tree_hash(request["base_source_dir"]) != row["base_tree_sha256"]):
+                    raise ValueError("agent modified the reviewed trees")
+                row.update(status="ok", output=validate_output(json.loads(p.stdout)))
+        except (ValueError, OSError, subprocess.TimeoutExpired, subprocess.SubprocessError) as error:
             row.update(status="error", error=str(error))
         row["elapsed_seconds"] = round(time.monotonic() - start, 3)
         results["cases"].append(row)
-        print(f"{case['id']}: {row['status']}", file=__import__('sys').stderr)
+        print(f"{case['id']}: {row['status']}", file=sys.stderr)
     return results

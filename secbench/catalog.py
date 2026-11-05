@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 
 CATALOG = Path(__file__).with_name("data") / "catalog.json"
+HISTORICAL_CONSTRUCTIONS = {"historical_commit_pair", "fix_reverted"}
+POSITIVE_VARIANTS = {"regression", "introduced_historical", "fix_reverted"}
+CONTROL_VARIANTS = {"safe_edit", "preexisting", "security_fix", "benign_nearby", "preexisting_touch"}
 
 
 def load(path=CATALOG):
@@ -32,16 +35,19 @@ def validate(data):
             require(case["validation"] == "advisory_only", "unsupported validation level")
             require(bool(case["labels"]), "missing labels")
         else:
-            require(case["validation"] == "function_boundary_checked", "unsupported PR validation")
-            require(case["construction"] == "authored_regression", "unsupported PR construction")
-            require(case["variant"] in {"regression","safe_edit","preexisting"}, "invalid variant")
-            require(bool(case["labels"]) == (case["variant"] == "regression"), "invalid PR expectations")
+            historical = case["construction"] in HISTORICAL_CONSTRUCTIONS
+            require(historical or case["construction"] == "authored_regression", "unsupported PR construction")
+            require(case["validation"] == ("source_reviewed" if historical else "function_boundary_checked"),
+                    "unsupported PR validation")
+            require(case["variant"] in POSITIVE_VARIANTS | CONTROL_VARIANTS, "invalid variant")
+            require(bool(case["labels"]) == (case["variant"] in POSITIVE_VARIANTS), "invalid PR expectations")
         for label in case["labels"]:
             require(label["id"] not in label_ids, "duplicate label")
             label_ids.add(label["id"])
             require(bool(label["mechanism"] and label["evidence_required"]), "missing rubric")
             require(label["source"].startswith("https://securitylab.github.com/advisories/"), "invalid source")
-            require(label["fix_commit"] is None and label["introducing_commit"] is None, "unverified PR commits")
+            if case.get("construction") not in HISTORICAL_CONSTRUCTIONS:
+                require(label["fix_commit"] is None and label["introducing_commit"] is None, "unverified PR commits")
     groups = {}
     for case in data["cases"]:
         group = case["leakage_group"]

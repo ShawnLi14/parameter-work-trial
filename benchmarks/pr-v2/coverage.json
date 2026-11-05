@@ -1,0 +1,19 @@
+{
+  "target_count": 49,
+  "covered": 37,
+  "unusable": {
+    "GHSL-2022-083": "Not used: this commit is not a clean introduction of the target and no easy alternative exists.",
+    "GHSL-2022-087": "No valid pair for the advisory's read-path injection. Introduction: interpolation of criteria and types in Neo4jGraphService dates to 97e9660 (405 files, +25185/-1758), and criterionToString arrived in 18dd5b6c (116 non-generated files, +3920/-1767); both oversized. 2e332d8c (16 files, +277/-109) was rejected: it adds computeEntityTypeWhereClause and '\"src:\" + type', but its base already formats sourceType into 'MATCH (src%s %s)...', so it only restructures the sink. Fix: none found. At HEAD f0e60763 the '\"src:\" + type' concatenation and toCriterionString both remain. d3c2a36d (#13793, +93/-68) parameterizes only addEdge/removeEdge write paths, so reverting it would label a different flow and base would still hold the target; it is used as a security_fix control instead. The file is unchanged between v0.8.44 and v0.8.45, despite the report's statement about fixes.",
+    "GHSL-2025-016": "Not used: this commit is not a clean introduction of the target and no easy alternative exists.",
+    "GHSL-2025-017": "Not used: this commit is not a clean introduction of the target and no easy alternative exists.",
+    "GHSL-2025-018": "Not used: this commit is not a clean introduction of the target and no easy alternative exists.",
+    "GHSL-2025-019": "Not used: this commit is not a clean introduction of the target and no easy alternative exists.",
+    "GHSL-2025-022": "Not used: this commit is not a clean introduction of the target and no easy alternative exists.",
+    "GHSL-2025-045": "Not used: this commit is not a clean introduction of the target and no easy alternative exists.",
+    "GHSL-2025-047": "Not used: this commit is not a clean introduction of the target and no easy alternative exists.",
+    "GHSL-2025-048": "Not used: this commit is not a clean introduction of the target and no easy alternative exists.",
+    "GHSL-2025-052": "No clean pair. The first form, 41ca6028d6b5, exceeds the size limit; 0c691191e894 and e937b625e4ca leave an exposure that already exists at base, and no upstream fix exists.",
+    "GHSL-2025-053": "No clean pair. The first form, 41ca6028d6b5, exceeds the size limit; 0c691191e894 and e937b625e4ca leave an exposure that already exists at base, and no upstream fix exists."
+  },
+  "unaccounted": []
+}

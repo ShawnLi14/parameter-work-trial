@@ -24,12 +24,73 @@ each with three variants**: a security regression, a safe edit, and an edit next
 a pre-existing vulnerability. These are authored transformations of the pinned
 upstream source, not claims about historical vulnerability-introducing commits.
 Function-level validation and target-specific controls are provided; no fixed tree
-is claimed to be globally vulnerability-free. The remaining four repositories are
-still snapshot-only. There is no production reviewer, model performance result,
-or measured agent improvement yet. The original work trial's core requirements
-are not yet complete, and no stretch goals have been attempted.
+is claimed to be globally vulnerability-free. A second suite built from real upstream
+commit pairs now covers all six repositories; see the historical PR suite below.
+There is no production reviewer, model performance result, or measured agent
+improvement yet. The original work trial's core requirements are not yet complete,
+and no stretch goals have been attempted.
+
+## Historical PR suite (pr-v2)
+
+`benchmarks/pr-v2/manifest.json` lists **real upstream commit pairs**, so reviewers see
+real PR diffs. It has 67 cases covering 37 of the 49 catalog targets: 27 vulnerable
+PRs, each the commit that added the bug or a reverted fix (a PR can carry several
+targets), and 40 clean controls (security fixes, nearby logic changes, and edits
+beside an existing flaw). Comment-only controls are not accepted.
+
+The other 12 targets are deliberately not used because no clean pair was easy to
+get; each has a reason under `unusable_targets`. This suite does not aim for all 49.
+
+```powershell
+python -m secbench build-history-prs --cache .bench/pr-v2-cache --out .bench/pr-v2
+python -m secbench --catalog .bench/pr-v2/catalog.json list
+python -m secbench --catalog .bench/pr-v2/catalog.json run --work .bench/pr-v2 --split dev --model YOUR_MODEL --out .bench/pr-v2-run.json -- python C:\absolute\path\agent.py
+```
+
+**Storage.** The build keeps one Git store per repository in `.bench/pr-v2-cache`, about
+540 MB in total, and never exports full trees. `run` unpacks each case's base and head
+folders just before reviewing it, then deletes them, and reports an error if the
+reviewer changed them. To mount one case in a sandbox, or to inspect it, unpack it by
+hand; `export` writes requests only, so their folders exist only after this:
+
+```powershell
+python -m secbench --catalog .bench/pr-v2/catalog.json unpack --case h001
+python -m secbench --catalog .bench/pr-v2/catalog.json unpack --case h001 --remove
+```
+
+The build fetches only the pinned commits and refuses an entry unless the pair is
+truly parent and child, every quoted line exists at its commit, every absence claim
+is true, and a control has no known issue. Add `--check-only` to run those checks
+without writing a suite. Case numbers are derived from a hash, so order reveals
+nothing. Requests omit commit IDs because a real SHA can be looked up. Keep the stores
+away from the reviewer as well: they contain the commit IDs and commit messages.
+Changelog files are left out of every diff, because they name the advisory a fix
+addresses, and a reversed fix would even show that entry being deleted.
+
+**How far to trust the labels.** Separate AI agents mined the pairs and then tried
+to refute them by reading source. Nothing was executed and no human reviewed them,
+so a label means "reviewed from source", not "exploit reproduced". Node, Ruby, and
+Java were not available, so these labels have no behavioral test.
+
+- Splits follow the repository: Flowise, Camaleon, RVC, and GPT-SoVITS are
+  development; DataHub and MarkUs are held out. Do not tune on held-out cases.
+- Cases in a repository are correlated, so they are not independent trials.
+- Reversed fixes read as removals, which is a different task from reviewing new code.
+- Size is imperfectly balanced: vulnerable PRs skew larger than controls overall, so
+  compare the `by_variant` scores rather than trusting one aggregate.
+
+**Grading.** Use `also_valid` for a correct finding listed in the case's `also_valid`
+entries, with its `also_valid_id`. These are real issues the diff introduces beyond
+its labels, such as other guards removed by a reverted fix, or targets dropped from
+this suite. They count as neither a hit nor a false positive. The scorer reports
+`by_variant` recall and alarm rates.
+
+Snapshots prepared before the line-ending fix keep the CRLF rewriting they received
+from a host-level `core.autocrlf`, so recorded tree hashes for them are host-specific.
 
 ## Reconstructed PR cases
+
+These earlier authored cases remain as sanity checks; prefer the historical suite.
 
 After preparing the snapshot catalog, build the PR suite in a fresh directory:
 
@@ -270,9 +331,7 @@ DataHub includes ten issues listed in its body; Flowise separates four XSS endpo
 These related findings are not independent experiments. Upstream licenses apply to
 prepared source files; source is fetched locally rather than redistributed here.
 
-To promote this seed into a PR benchmark, identify and pin a base/head pair for
-each selected target, establish that the failure is absent at base and present at
-head, validate a repaired counterpart, and add independently reviewed benign PRs.
-Record exploit/regression-test evidence and adjudicate incomplete fixes separately.
-Keep snapshot results separate from PR introduction results. Finish those steps
-before claiming the original assignment's core benchmark is complete.
+Remaining benchmark work: have a human check a sample of the AI-reviewed labels, and
+add exploit or regression-test evidence where a runtime is available. Keep snapshot
+results separate from PR introduction results. A real reviewer still has to be built
+and run before claiming the original assignment's core benchmark is complete.

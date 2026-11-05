@@ -226,11 +226,16 @@ class HistoricalFixture(unittest.TestCase):
             for secret in ("labels", "variant", "commit\"", "upstream_pr", self.c0, self.c1, self.c2, LABEL):
                 self.assertNotIn(secret, blob)
             self.assertTrue(request["diff"])
+            self.assertNotIn("source_dir", request)
+            self.assertIn("lookup", request)
 
         agent = ROOT / "examples" / "empty_agent.py"
         results = run(suite, suite["cases"], destination, [sys.executable, str(agent)], "smoke", 20)
         self.assertEqual({c["ref"] for c in suite["cases"]}, {r["commit"] for r in results["cases"]})
-        self.assertTrue(all(r["status"] == "ok" and r["base_tree_sha256"] for r in results["cases"]))
+        self.assertTrue(all(r["status"] == "ok" for r in results["cases"]))
+        self.assertEqual([], list((destination / "sources").iterdir()))
+        unpacked = run(suite, suite["cases"], destination, [sys.executable, str(agent)], "smoke", 20, unpack=True)
+        self.assertTrue(all(r["status"] == "ok" and r["base_tree_sha256"] for r in unpacked["cases"]))
         self.assertEqual([], list((destination / "sources").iterdir()))
         self.assertEqual([], list((destination / "bases").iterdir()))
         metrics = score(suite, results, grade_template(results))
@@ -253,11 +258,11 @@ class HistoricalFixture(unittest.TestCase):
         probe.write_text("import json, sys\nrequest = json.load(sys.stdin)\n"
                          "open('app.py', 'rb').read()\nopen(request['base_source_dir'] + '/app.py', 'rb').read()\n"
                          "print(json.dumps({'findings': []}))\n", encoding="utf-8")
-        self.assertEqual("ok", run(suite, [positive], destination, [sys.executable, str(probe)], "probe", 20)["cases"][0]["status"])
+        self.assertEqual("ok", run(suite, [positive], destination, [sys.executable, str(probe)], "probe", 20, unpack=True)["cases"][0]["status"])
         writer = Path(self.tmp.name) / "writer.py"
         writer.write_text("import json, sys\njson.load(sys.stdin)\nopen('app.py', 'w').write('changed')\n"
                           "print(json.dumps({'findings': []}))\n", encoding="utf-8")
-        row = run(suite, [positive], destination, [sys.executable, str(writer)], "writer", 20)["cases"][0]
+        row = run(suite, [positive], destination, [sys.executable, str(writer)], "writer", 20, unpack=True)["cases"][0]
         self.assertEqual("error", row["status"])
         self.assertIn("modified", row["error"])
         self.assertFalse((destination / "sources" / positive["id"]).exists())

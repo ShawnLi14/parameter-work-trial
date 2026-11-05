@@ -47,11 +47,29 @@ python -m secbench --catalog .bench/pr-v2/catalog.json list
 python -m secbench --catalog .bench/pr-v2/catalog.json run --work .bench/pr-v2 --split dev --model YOUR_MODEL --out .bench/pr-v2-run.json -- python C:\absolute\path\agent.py
 ```
 
-**Storage.** The build keeps one Git store per repository in `.bench/pr-v2-cache`, about
-540 MB in total, and never exports full trees. `run` unpacks each case's base and head
-folders just before reviewing it, then deletes them, and reports an error if the
-reviewer changed them. To mount one case in a sandbox, or to inspect it, unpack it by
-hand; `export` writes requests only, so their folders exist only after this:
+**Storage and code lookup.** The build keeps one Git store per repository in
+`.bench/pr-v2-cache`, about 540 MB in total, and never exports full trees. A request
+holds the case ID, the diff, and a `lookup.command`; there is no `source_dir`. To see
+surrounding code, the reviewer appends an action to that command and reads JSON from
+stdout. Each lookup takes well under a second, even on DataHub:
+
+```powershell
+<lookup.command> read --side head --path app/models/user.rb --start 40 --end 80
+<lookup.command> search --side base --pattern "def checked_join" --path app
+<lookup.command> list --side head --path app/controllers
+```
+
+`base` is the pre-change code and `head` the proposed code. Results never contain a
+commit ID or commit message, and changelog files are hidden. Searches are extended
+regular expressions, capped at 200 matches; reads are capped at 2000 lines. The
+current diff-only reviewer can ignore the lookup command entirely.
+
+The lookup command runs the benchmark CLI, which can also read the catalog. For a
+credible evaluation, run lookups outside the reviewer's sandbox and relay only their
+output. Run `run` or `export` with `--unpack` to give a reviewer plain base and head
+folders instead: each case is unpacked just before review, deleted afterwards, and
+reported as an error if the reviewer changed it. DataHub takes several minutes per
+case this way. To mount or inspect one case by hand:
 
 ```powershell
 python -m secbench --catalog .bench/pr-v2/catalog.json unpack --case h001

@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import zipfile
 
@@ -161,7 +162,7 @@ def checked_lock(data, case, work):
     return lock
 
 
-def task(data, case, work):
+def task(data, case, work, lookup_command=None, unpack=False):
     lock = checked_lock(data, case, work)
     request = {"schema_version": 1, "task_id": case["id"], "mode": case["mode"],
             "source_dir": lock["source_dir"], "commit": lock["commit"],
@@ -176,6 +177,20 @@ def task(data, case, work):
         del request["commit"]
         request["instructions"] = ("Report each distinct vulnerability as its own finding, even if "
             "several share a pattern; one finding is credited to at most one issue. " + request["instructions"])
+    if lock.get("on_demand") and not unpack:
+        # The reviewer gets the diff plus lookup commands; no tree is unpacked.
+        del request["source_dir"]
+        request["lookup"] = {
+            "command": [*(lookup_command or []), "--case", case["id"]],
+            "usage": ("Append one of: read --side base|head --path FILE [--start N] [--end N]; "
+                      "search --side base|head --pattern REGEX [--path DIR] [--ignore-case]; "
+                      "list --side base|head [--path DIR]. Output is JSON on stdout.")}
+        request["diff"] = (Path(work) / "diffs" / (case["id"] + ".patch")).read_text(encoding="utf-8")
+        request["instructions"] = ("Review the proposed diff for security vulnerabilities it introduces. "
+            "base is the pre-change code and head is the proposed code; use the lookup command to read "
+            "or search either side. Existing vulnerabilities unchanged by the diff do not count. Explain "
+            "introduction relative to base in each finding. " + request["instructions"])
+        return request
     if case["mode"] == "pr":
         request["base_source_dir"]=lock["base_source_dir"]
         request["diff"]=(Path(work)/"diffs"/(case["id"]+".patch")).read_text(encoding="utf-8")
@@ -206,29 +221,32 @@ def validate_output(output):
     return output
 
 
-def run(data, cases, work, command, model, timeout):
+def run(data, cases, work, command, model, timeout, lookup_command=None, unpack=False):
     if not command:
         raise ValueError("missing agent command after --")
     results = {"schema_version": 1, "catalog_sha256": digest(data),
                "model": model, "command": command, "cases": []}
     for case in cases:
         lock = checked_lock(data, case, work)
-        request = task(data, case, work)
+        request = task(data, case, work, lookup_command, unpack)
+        trees = "source_dir" in request and (unpack or not lock.get("on_demand"))
         start = time.monotonic()
         row = {"case_id": case["id"], "commit": lock["commit"]}
         try:
-            with case_trees(lock):
-                row["head_tree_sha256"] = tree_hash(request["source_dir"])
-                if lock.get("on_demand"):
-                    row["base_tree_sha256"] = tree_hash(request["base_source_dir"])
+            with case_trees(lock) if trees else contextlib.nullcontext(), \
+                    (contextlib.nullcontext(request["source_dir"]) if trees else tempfile.TemporaryDirectory()) as cwd:
+                if trees:
+                    row["head_tree_sha256"] = tree_hash(request["source_dir"])
+                    if lock.get("on_demand"):
+                        row["base_tree_sha256"] = tree_hash(request["base_source_dir"])
                 p = subprocess.run(command, input=json.dumps(request), capture_output=True,
-                                   text=True, encoding="utf-8", cwd=request["source_dir"],
+                                   text=True, encoding="utf-8", cwd=cwd,
                                    timeout=timeout, shell=False)
                 if p.returncode:
                     raise ValueError(f"agent exit {p.returncode}: {p.stderr[-2000:]}")
                 checked_lock(data, case, work)
-                if lock.get("on_demand") and (tree_hash(request["source_dir"]) != row["head_tree_sha256"]
-                                              or tree_hash(request["base_source_dir"]) != row["base_tree_sha256"]):
+                if trees and lock.get("on_demand") and (tree_hash(request["source_dir"]) != row["head_tree_sha256"]
+                                                        or tree_hash(request["base_source_dir"]) != row["base_tree_sha256"]):
                     raise ValueError("agent modified the reviewed trees")
                 row.update(status="ok", output=validate_output(json.loads(p.stdout)))
         except (ValueError, OSError, subprocess.TimeoutExpired, subprocess.SubprocessError) as error:

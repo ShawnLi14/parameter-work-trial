@@ -9,6 +9,12 @@ from .runner import checked_lock, prepare, read_json, remove_case, run, task, un
 from .scoring import grade_template, score
 
 
+def lookup_command(args):
+    """The command a reviewer appends a lookup action to; it carries no commit IDs."""
+    return [sys.executable, "-m", "secbench", "--catalog", str(Path(args.catalog).resolve()),
+            "lookup", "--work", str(Path(args.work).resolve())]
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description="Security Lab source benchmark")
     p.add_argument("--catalog", type=Path, default=CATALOG)
@@ -30,6 +36,20 @@ def main(argv=None):
     unpack.add_argument("--case", required=True)
     unpack.add_argument("--work", type=Path, default=Path(".bench/pr-v2"))
     unpack.add_argument("--remove", action="store_true", help="delete the case's unpacked trees instead")
+    look = sub.add_parser("lookup", help="read, search, or list a PR case's code from its Git store")
+    look.add_argument("--work", type=Path, default=Path(".bench/pr-v2"))
+    look.add_argument("--case", required=True)
+    look_actions = look.add_subparsers(dest="lookup_action", required=True)
+    for name in ("read", "search", "list"):
+        action = look_actions.add_parser(name)
+        action.add_argument("--side", choices=["base", "head"], required=True)
+        action.add_argument("--path", required=(name == "read"))
+        if name == "read":
+            action.add_argument("--start", type=int, default=1)
+            action.add_argument("--end", type=int)
+        if name == "search":
+            action.add_argument("--pattern", required=True)
+            action.add_argument("--ignore-case", action="store_true")
     freeze = sub.add_parser("freeze")
     freeze.add_argument("--out", required=True)
     for name in ("prepare", "export", "run"):
@@ -41,6 +61,8 @@ def main(argv=None):
             cmd.add_argument("--from-repo", type=Path, help="existing local clone; requires one --case")
         else:
             cmd.add_argument("--out", required=True)
+        if name in ("export", "run"):
+            cmd.add_argument("--unpack", action="store_true", help="give on-demand PR cases unpacked folders instead of lookup commands")
         if name == "run":
             cmd.add_argument("--model", required=True)
             cmd.add_argument("--timeout", type=int, default=300)
@@ -75,6 +97,21 @@ def main(argv=None):
             print(f"Targets: {covered['covered']}/{covered['target_count']} covered, {len(covered['unusable'])} not used, {len(covered['unaccounted'])} unaccounted.")
             if not args.check_only:
                 write_json(args.out/"coverage.json",covered)
+        elif args.action == "lookup":
+            from . import lookup
+            case = next((c for c in data["cases"] if c["id"] == args.case), None)
+            if case is None:
+                raise ValueError("unknown case ID")
+            lock = checked_lock(data,case,args.work)
+            if not lock.get("on_demand"):
+                raise ValueError("this case is not stored on demand")
+            if args.lookup_action == "read":
+                result = lookup.read(lock,args.side,args.path,args.start,args.end)
+            elif args.lookup_action == "search":
+                result = lookup.search(lock,args.side,args.pattern,args.path,args.ignore_case)
+            else:
+                result = lookup.listing(lock,args.side,args.path)
+            print(json.dumps(result))
         elif args.action == "unpack":
             case = next((c for c in data["cases"] if c["id"] == args.case), None)
             if case is None:
@@ -109,10 +146,10 @@ def main(argv=None):
                     lock = prepare(data,c,args.work,args.from_repo)
                     print(f"Prepared {c['id']} @ {lock['commit']}")
             elif args.action == "export":
-                write_json(args.out, [task(data,c,args.work) for c in selected])
+                write_json(args.out, [task(data,c,args.work,lookup_command(args),args.unpack) for c in selected])
             else:
                 command = args.command[1:] if args.command[:1] == ["--"] else args.command
-                result = run(data,selected,args.work,command,args.model,args.timeout)
+                result = run(data,selected,args.work,command,args.model,args.timeout,lookup_command(args),args.unpack)
                 write_json(args.out,result)
                 return int(any(c["status"] == "error" for c in result["cases"]))
         elif args.action == "grade-template":

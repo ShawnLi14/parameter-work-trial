@@ -352,7 +352,7 @@
       "files_changed": 13,
       "lines_changed": 256,
       "confidence": "high",
-      "caveats": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+      "caveats": "The same reflection already exists at base in sibling routes such as GET /api/v1/chatflows/:id (head line 186), so this adds a new instance of an existing pattern. A reviewer flagging only those older lines has not identified this diff. text/html comes from Express default behaviour, not from code in this repo, and was not run. A non-UUID id is assumed to return null on the default SQLite; a stricter database may raise an error instead (not tested). The isPublic check applies only when a chatflow is found, so it does not guard the 404 path.",
       "control_scope": "this_diff_only",
       "also_valid": [
         {
@@ -1372,7 +1372,7 @@
       "files_changed": 17,
       "lines_changed": 596,
       "confidence": "high",
-      "caveats": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+      "caveats": "fix_reverted, so base is the fix and head is its first parent; the numbers describe that reversed diff. Why not introductions: 063, 064 and 068 first appear in 10fcd662 (Starter code redesign #4751), which creates both starter controllers but has 73 files and 2309 changed lines, over both limits. 060 has no single usable introduction: the params[:path] flow dates to 2009 (d671db32), the on-disk write to a WIP Git backend commit (93b0d6eb, 2014, when production.rb still set REPOSITORY_TYPE to svn, so only partly reachable), and later commits (9f209e40, 96dbcd72) are refactors. Confound: this same diff also reverts the guards for 062, 065, 066 and 067, credited to other entries, plus repository_helper checks and the unrelated Note constantize fix, so a reviewer flagging those is also correct. Catalog says StarterFileGroupsController#download, but the code and advisory detail use download_file. Same patch also exists as ccd6c633 on the release line (parent v2.4.7). Not reproduced; reach is from the advisory plus code reading. Mismatch: StarterFileGroupPolicy at head maps download_file to read? (instructor or TA), so 068 reach is wider than the advisory's instructors.",
       "control_scope": "this_diff_only",
       "also_valid": [
         {
@@ -1420,13 +1420,13 @@
         {
           "label_id": null,
           "description": "Reverted guard in SubmissionsHelper#upload_file: API params[:filename] with ../ reaches add_file and the same write_file sink as 060.",
-          "evidence": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+          "evidence": "app/helpers/submissions_helper.rb upload_file and app/helpers/repository_helper.rb:53-54 at f9d843e1",
           "id": "av8"
         },
         {
           "label_id": null,
           "description": "Reverted guard in RepositoryHelper#add_folder: new_folders or zip directory names with ../ reach add_directory, which writes an empty .gitkeep outside the repository via add_file and write_file.",
-          "evidence": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+          "evidence": "app/helpers/repository_helper.rb:139 and app/lib/git_repository.rb add_directory at f9d843e1",
           "id": "av9"
         }
       ]
@@ -1497,7 +1497,7 @@
         {
           "id": "GHSL-2025-015",
           "title": "Code injection",
-          "mechanism": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+          "mechanism": "Textbox ckpt_path2 -> change_info_ -> sibling train.log -> eval(file content). The attacker must control that file; a path to any directory holding a crafted train.log suffices.",
           "location_hint": "infer-web.py: change_info_",
           "evidence_required": [
             "Identify the attacker-controlled input or capability and relevant preconditions.",
@@ -1783,7 +1783,7 @@
       "files_changed": 11,
       "lines_changed": 1241,
       "confidence": "high",
-      "caveats": "Withheld pending private disclosure; see .bench/private/pr-v2-review.",
+      "caveats": "Location mismatch: catalog says export.py export_onnx; at this commit the function is in infer-web.py and moved later (a5e6dfb). Sibling unsafe loads on other inputs already exist at base (for example get_vc and process_ckpt), so the wider pattern pre-exists, but this sink and its input are new. The diff is 1241 lines, 849 of them one model file. Not reproduced.",
       "control_scope": "this_diff_only",
       "also_valid": [
         {

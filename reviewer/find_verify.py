@@ -14,7 +14,7 @@ import re
 import threading
 import time
 
-from .baseline import DEFAULT_MODEL, PROVIDERS, build_payload, send, sha256, validate_findings
+from .baseline import DEFAULT_MODEL, DEFAULT_PROVIDER, PROVIDERS, build_payload, send, sha256, validate_findings
 from .code_access import validate_action
 from .evidence import Evidence
 from .tools import (BASE, CITATION, CITATION_RULES, LOOKUP_TOOL, RATE_LIMIT_ATTEMPTS, NoToolCall,
@@ -163,7 +163,7 @@ def finder_messages(context, system):
             {"role": "user", "content": json.dumps(model_context(context), ensure_ascii=False)}]
 
 
-def finder_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effort="medium", provider="openrouter",
+def finder_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effort="medium", provider=DEFAULT_PROVIDER,
                    profile=None):
     profile = profile or load_profile()
     payload = build_payload(context, model, max_tokens, reasoning_effort, provider)
@@ -188,7 +188,7 @@ def check_candidate(item, diff_lines):
 
 
 def review(context, api_key, *, access, model=DEFAULT_MODEL, max_tokens=16384,
-           reasoning_effort="medium", timeout=240, record=None, provider="openrouter", limits=None, profile=None):
+           reasoning_effort="medium", timeout=240, record=None, provider=DEFAULT_PROVIDER, limits=None, profile=None):
     limits = limits or FindVerifyLimits()
     profile = profile or load_profile()
     if not api_key or not api_key.strip():
@@ -412,8 +412,8 @@ def review(context, api_key, *, access, model=DEFAULT_MODEL, max_tokens=16384,
         "prompt_sha256": sha256(FINDER + SPECIALIST + VERIFIER + json.dumps([FINDER_TOOLS, VERIFIER_TOOLS], sort_keys=True)),
         "context_sha256": sha256(json.dumps(context, sort_keys=True)),
         "requested_model": model, "provider": provider, "model_calls": len(trace["calls"]), "usage": usage,
-        "cost_usd": sum(costs) if reported_cost else 0.0 if model.endswith(":free") else None,
-        "cost_source": "provider" if reported_cost else "free_variant_estimate" if model.endswith(":free") else "unknown",
+        "cost_usd": sum(costs) if reported_cost else None,
+        "cost_source": "provider" if reported_cost else "unknown",
         "elapsed_seconds": round(time.monotonic()-started, 3), "limits": asdict(limits),
         "max_tokens_per_call": max_tokens, "reasoning_effort": reasoning_effort,
         "limitations": ["Only candidates the finder reported were verified; no guarantee of complete coverage.",

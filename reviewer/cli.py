@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import sys
 
-from .baseline import PROVIDERS, build_payload, review
+from .baseline import DEFAULT_PROVIDER, PROVIDERS, build_payload, review
 from .config import load_environment
 from .inputs import context_from_request, fetch_pr
 
@@ -42,8 +42,9 @@ def main(argv=None):
     parser.add_argument("--max-calls", type=positive_int, default=150, help="find-verify: total model-call ceiling")
     parser.add_argument("--review-timeout", type=positive_int, default=300, help="find-verify: stop starting work after this many seconds")
     parser.add_argument("--max-context-chars", type=positive_int, default=300_000, help="find-verify: per-call message size limit")
-    parser.add_argument("--provider", choices=sorted(PROVIDERS), help="model provider (default: REVIEW_PROVIDER, else openrouter)")
-    parser.add_argument("--model", help="override the model; REVIEW_MODEL applies to OpenRouter only")
+    parser.add_argument("--provider", choices=sorted(PROVIDERS),
+                        help=f"cerebras (gpt-oss-120b) or anthropic (claude-haiku-5-5); default: REVIEW_PROVIDER, else {DEFAULT_PROVIDER}")
+    parser.add_argument("--model", help="override the provider's default model")
     parser.add_argument("--out", type=Path, help="write review JSON here instead of stdout")
     parser.add_argument("--record", type=Path, help="save exact prompt and raw response (contains source code; no API key)")
     parser.add_argument("--dry-run", action="store_true", help="emit exact model payload without calling the provider")
@@ -57,12 +58,10 @@ def main(argv=None):
             raise ValueError("--base-dir and --head-dir require each other, --diff, and --strategy find-verify")
         environment = load_environment()
         github_token = environment.get("GITHUB_TOKEN") or environment.get("GH_TOKEN")
-        args.provider = args.provider or environment.get("REVIEW_PROVIDER") or "openrouter"
+        args.provider = args.provider or environment.get("REVIEW_PROVIDER") or DEFAULT_PROVIDER
         if args.provider not in PROVIDERS:
             raise ValueError(f"Unknown provider {args.provider!r}")
-        # REVIEW_MODEL names an OpenRouter model, so it never applies to another provider.
-        configured = environment.get("REVIEW_MODEL") if args.provider == "openrouter" else None
-        args.model = args.model or configured or PROVIDERS[args.provider]["model"]
+        args.model = args.model or PROVIDERS[args.provider]["model"]
         if args.pr:
             request = fetch_pr(args.pr, github_token)
         elif args.diff:

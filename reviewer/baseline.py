@@ -9,33 +9,30 @@ from . import __version__
 from .http import request_json
 from .prompt import PROMPT_VERSION, SYSTEM_PROMPT
 
-DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
-BASE_URL = "https://openrouter.ai/api/v1"
-# OpenRouter and Cerebras speak the OpenAI chat-completions format; they differ in
-# endpoint, key, default model, and how reasoning effort and output length are requested.
-# Anthropic requests are built in the same shape and converted by reviewer/claude.py.
+DEFAULT_PROVIDER = "cerebras"
+DEFAULT_MODEL = "gpt-oss-120b"
+# Requests are built in the OpenAI chat-completions shape, which Cerebras speaks natively.
+# Claude requests are converted to the Messages API by reviewer/claude.py.
 PROVIDERS = {
-    "openrouter": {"url": BASE_URL, "key": "OPENROUTER_API_KEY", "model": DEFAULT_MODEL},
-    "cerebras": {"url": "https://api.cerebras.ai/v1", "key": "CEREBRAS_API_KEY", "model": "gpt-oss-120b"},
+    "cerebras": {"url": "https://api.cerebras.ai/v1", "key": "CEREBRAS_API_KEY", "model": DEFAULT_MODEL},
     "anthropic": {"url": "https://api.anthropic.com/v1", "key": "ANTHROPIC_API_KEY", "model": "claude-haiku-5-5"},
 }
 
 
-def send(provider, payload, api_key, timeout, headers=None):
+def send(provider, payload, api_key, timeout):
     """One model request in chat-completions shape, to whichever provider is selected."""
     if provider == "anthropic":
         from .claude import complete
         return complete(payload, api_key, timeout)
     return request_json(PROVIDERS[provider]["url"] + "/chat/completions", payload=payload, timeout=timeout,
-                        headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json",
-                                 **(headers or {})})
+                        headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"})
 
 
 def sha256(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def build_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effort="medium", provider="openrouter"):
+def build_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effort="medium", provider=DEFAULT_PROVIDER):
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": json.dumps(context, ensure_ascii=False, sort_keys=True)},
@@ -44,22 +41,11 @@ def build_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effo
         # Current Claude models reject sampling parameters; effort controls thinking.
         return {"model": model, "messages": messages, "max_completion_tokens": max_tokens,
                 "reasoning_effort": "low" if reasoning_effort == "none" else reasoning_effort, "stream": False}
-    if provider == "cerebras":
-        # gpt-oss always reasons; "low" is the closest setting to none.
-        return {"model": model, "messages": messages, "temperature": 0,
-                "max_completion_tokens": max_tokens,
-                "reasoning_effort": "low" if reasoning_effort == "none" else reasoning_effort,
-                "stream": False}
-    return {
-        "model": model,
-        "messages": messages,
-        "temperature": 0,
-        "max_tokens": max_tokens,
-        "reasoning": {"effort": reasoning_effort},
-        "stream": False,
-        # Do not silently route to a different model or drop required parameters.
-        "provider": {"require_parameters": True},
-    }
+    # gpt-oss always reasons; "low" is the closest setting to none.
+    return {"model": model, "messages": messages, "temperature": 0,
+            "max_completion_tokens": max_tokens,
+            "reasoning_effort": "low" if reasoning_effort == "none" else reasoning_effort,
+            "stream": False}
 
 
 def validate_findings(value):
@@ -121,7 +107,7 @@ def parse_response(response):
 
 
 def review(context, api_key, *, model=DEFAULT_MODEL, max_tokens=16384,
-           reasoning_effort="medium", timeout=240, record=None, provider="openrouter"):
+           reasoning_effort="medium", timeout=240, record=None, provider=DEFAULT_PROVIDER):
     settings = PROVIDERS[provider]
     if not api_key or not api_key.strip():
         raise ValueError(f"Set {settings['key']} before running a live review")
@@ -131,8 +117,7 @@ def review(context, api_key, *, model=DEFAULT_MODEL, max_tokens=16384,
         record(trace)
     start = time.monotonic()
     try:
-        headers = {"X-OpenRouter-Title": "Security PR Review Baseline"} if provider == "openrouter" else None
-        response = send(provider, payload, api_key, timeout, headers)
+        response = send(provider, payload, api_key, timeout)
         trace["response"] = response
         if record:
             record(trace)
@@ -144,8 +129,6 @@ def review(context, api_key, *, model=DEFAULT_MODEL, max_tokens=16384,
         raise
     usage = response.get("usage") or {}
     cost = usage.get("cost")
-    # This estimate is specific to the explicitly selected free variant.
-    estimate = 0.0 if model.endswith(":free") else None
     return {"findings": findings, "metadata": {
         "status": "completed", "scope": "diff_only", "agent_version": __version__,
         "prompt_version": PROMPT_VERSION, "prompt_sha256": sha256(SYSTEM_PROMPT),
@@ -153,8 +136,7 @@ def review(context, api_key, *, model=DEFAULT_MODEL, max_tokens=16384,
         "request_sha256": sha256(json.dumps(payload, sort_keys=True)),
         "requested_model": model, "returned_model": response.get("model"),
         "provider": response.get("provider") or provider, "response_id": response.get("id"),
-        "usage": usage, "cost_usd": cost if cost is not None else estimate,
-        "cost_source": "provider" if cost is not None else ("free_variant_estimate" if estimate is not None else "unknown"),
+        "usage": usage, "cost_usd": cost, "cost_source": "provider" if cost is not None else "unknown",
         "elapsed_seconds": round(time.monotonic() - start, 3), "model_calls": 1,
         "temperature": 0, "max_tokens": max_tokens, "reasoning_effort": reasoning_effort,
         "limitations": ["Only the supplied diff and its context lines were reviewed.",

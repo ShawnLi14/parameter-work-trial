@@ -211,7 +211,7 @@ all candidates, not only findings, against the labels.
 
 **Each round:**
 
-1. An optimizer model (Cerebras `gpt-oss-120b`, high reasoning) sees the current
+1. An optimizer model (the reviewer's model by default, at high reasoning) sees the current
    profile, the dev failures grouped by stage, and earlier rounds' edits. It writes
    a diagnosis (stage, bottleneck, intended and actual behaviour) and exactly one
    edit: set the verifier criteria, set the finder guidance, or add, update, or
@@ -227,6 +227,8 @@ all candidates, not only findings, against the labels.
 
 ```powershell
 python -m benchmark.improve --name run1 --rounds 3
+# On Claude (run with a Python that has the anthropic SDK); --optimizer-model picks another optimizer:
+python -m benchmark.improve --name run2 --rounds 3 --provider anthropic --model claude-haiku-5-5
 # Reuse an existing full run's dev cases as round 0 instead of re-running them:
 python -m benchmark.improve --name run1 --rounds 3 --seed-results .bench/fv-full-run.json
 # Evaluate a finished profile on the held-out split (never done inside the loop):

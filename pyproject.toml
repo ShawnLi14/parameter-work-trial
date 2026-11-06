@@ -5,9 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "security-review-bench"
 version = "0.1.0"
-description = "Security review benchmark built from real upstream PRs, and a baseline reviewer"
+description = "Security review benchmark built from real upstream PRs, and security PR reviewers"
 requires-python = ">=3.11"
 dependencies = []
+
+[project.optional-dependencies]
+# Only the Claude provider needs a third-party package.
+claude = ["anthropic>=2"]
 
 [project.scripts]
 benchmark = "benchmark.cli:main"

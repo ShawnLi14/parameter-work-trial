@@ -373,7 +373,7 @@ def main(argv=None):
                         help="bugs found may fall at most this far below the starting profile")
     parser.add_argument("--seed-results", help="existing results of the starting profile (dev cases are reused)")
     parser.add_argument("--evaluate-holdout", help="evaluate this profile on the holdout split and stop")
-    parser.add_argument("--provider", default="cerebras", choices=["cerebras", "openrouter", "anthropic"],
+    parser.add_argument("--provider", default="cerebras", choices=["cerebras", "anthropic"],
                         help="provider for the reviewer runs and the optimizer")
     parser.add_argument("--model", help="reviewer model (default: the provider's default)")
     parser.add_argument("--optimizer-model", help="optimizer model (default: the reviewer model)")

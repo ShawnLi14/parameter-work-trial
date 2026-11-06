@@ -158,7 +158,7 @@ class CliTests(unittest.TestCase):
     def test_cli_output_contains_only_protocol_json(self):
         stdout = io.StringIO()
         with patch("reviewer.cli.sys.stdin", io.StringIO(json.dumps({"mode": "pr", "diff": DIFF}))), \
-                patch.dict(os.environ, {"OPENROUTER_API_KEY": "test"}), \
+                patch.dict(os.environ, {"CEREBRAS_API_KEY": "test"}), \
                 patch("reviewer.baseline.request_json", return_value=completion()), contextlib.redirect_stdout(stdout):
             code = main([])
         self.assertEqual(code, 0)
@@ -166,52 +166,56 @@ class CliTests(unittest.TestCase):
 
     def test_missing_key_emits_no_success_json(self):
         stdout, stderr = io.StringIO(), io.StringIO()
-        with patch.dict(os.environ, {"OPENROUTER_API_KEY": ""}), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        with patch.dict(os.environ, {"CEREBRAS_API_KEY": ""}), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             code = main(["--diff", str(ROOT / "reviewer/example.diff")])
         self.assertEqual(code, 2)
         self.assertEqual(stdout.getvalue(), "")
-        self.assertIn("OPENROUTER_API_KEY", stderr.getvalue())
+        self.assertIn("CEREBRAS_API_KEY", stderr.getvalue())
 
 
 class ConfigTests(unittest.TestCase):
     def test_dotenv_values_quotes_comments_and_process_precedence(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / ".env"
-            path.write_text('# comment\nOPENROUTER_API_KEY="file-key"\nREVIEW_MODEL=example/model # comment\n'
+            path.write_text('# comment\nCEREBRAS_API_KEY="file-key"\nREVIEW_PROVIDER=anthropic # comment\n'
                             "export GITHUB_TOKEN='github-key'\nIGNORED=anything\n", encoding="utf-8")
-            with patch.dict(os.environ, {"OPENROUTER_API_KEY": "process-key"}, clear=True):
+            with patch.dict(os.environ, {"CEREBRAS_API_KEY": "process-key"}, clear=True):
                 environment = load_environment(path)
-            self.assertEqual(environment, {"OPENROUTER_API_KEY": "process-key",
-                                          "REVIEW_MODEL": "example/model", "GITHUB_TOKEN": "github-key"})
+            self.assertEqual(environment, {"CEREBRAS_API_KEY": "process-key",
+                                          "REVIEW_PROVIDER": "anthropic", "GITHUB_TOKEN": "github-key"})
 
     def test_working_directory_dotenv_is_never_loaded(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             trusted = root / "trusted.env"
-            trusted.write_text("REVIEW_MODEL=trusted/model\n", encoding="utf-8")
-            (root / ".env").write_text("REVIEW_MODEL=attacker/model\n", encoding="utf-8")
+            trusted.write_text("REVIEW_PROVIDER=cerebras\n", encoding="utf-8")
+            (root / ".env").write_text("REVIEW_PROVIDER=attacker\n", encoding="utf-8")
             with patch("reviewer.config.ENV_PATH", trusted), patch.dict(os.environ, {}, clear=True), \
                     contextlib.chdir(root):
-                self.assertEqual(load_environment()["REVIEW_MODEL"], "trusted/model")
+                self.assertEqual(load_environment()["REVIEW_PROVIDER"], "cerebras")
 
     def test_invalid_config_does_not_echo_secrets(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / ".env"
-            path.write_text('OPENROUTER_API_KEY="secret\n', encoding="utf-8")
+            path.write_text('CEREBRAS_API_KEY="secret\n', encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "line 1") as raised:
                 load_environment(path)
             self.assertNotIn("secret", str(raised.exception))
 
 
-class CerebrasProviderTests(unittest.TestCase):
-    def test_payload_uses_cerebras_fields_only(self):
+class ProviderTests(unittest.TestCase):
+    def test_only_cerebras_and_claude_are_providers(self):
+        self.assertEqual({"cerebras", "anthropic"}, set(PROVIDERS))
+        self.assertEqual("gpt-oss-120b", DEFAULT_MODEL)
+
+    def test_payload_uses_cerebras_fields(self):
         payload = build_payload({"diff": DIFF}, "gpt-oss-120b", 8000, "none", "cerebras")
         self.assertEqual("low", payload["reasoning_effort"])
         self.assertEqual(8000, payload["max_completion_tokens"])
-        for openrouter_only in ("provider", "reasoning", "max_tokens"):
-            self.assertNotIn(openrouter_only, payload)
+        for unused in ("provider", "reasoning", "max_tokens"):
+            self.assertNotIn(unused, payload)
 
-    def test_review_calls_cerebras_with_its_key_and_no_openrouter_header(self):
+    def test_review_calls_cerebras_with_its_key(self):
         calls = []
 
         def fake(url, **kwargs):
@@ -223,7 +227,6 @@ class CerebrasProviderTests(unittest.TestCase):
         url, kwargs = calls[0]
         self.assertEqual("https://api.cerebras.ai/v1/chat/completions", url)
         self.assertEqual("Bearer csk-test", kwargs["headers"]["Authorization"])
-        self.assertNotIn("X-OpenRouter-Title", kwargs["headers"])
         self.assertEqual("cerebras", result["metadata"]["provider"])
         with self.assertRaisesRegex(ValueError, "CEREBRAS_API_KEY"):
             review({"diff": DIFF}, "", provider="cerebras")
@@ -242,14 +245,15 @@ class CerebrasProviderTests(unittest.TestCase):
         self.assertEqual("security-review-baseline", seen[0].get_header("User-agent"))
         self.assertEqual("Bearer x", seen[0].get_header("Authorization"))
 
-    def test_cli_ignores_openrouter_model_setting_for_cerebras(self):
-        stdout = io.StringIO()
-        with patch.dict(os.environ, {"REVIEW_MODEL": "nvidia/some-openrouter-model"}), \
-                contextlib.redirect_stdout(stdout):
-            self.assertEqual(0, main(["--diff", str(ROOT / "reviewer/example.diff"), "--provider", "cerebras", "--dry-run"]))
-        payload = json.loads(stdout.getvalue())
-        self.assertEqual("gpt-oss-120b", payload["model"])
-        self.assertIn("cerebras", PROVIDERS)
+    def test_review_provider_setting_picks_the_default_model(self):
+        for provider, model in (("anthropic", "claude-haiku-5-5"), ("cerebras", "gpt-oss-120b")):
+            stdout = io.StringIO()
+            with self.subTest(provider=provider), patch.dict(os.environ, {"REVIEW_PROVIDER": provider}), \
+                    contextlib.redirect_stdout(stdout):
+                self.assertEqual(0, main(["--diff", str(ROOT / "reviewer/example.diff"), "--dry-run"]))
+            self.assertEqual(model, json.loads(stdout.getvalue())["model"])
+        with self.assertRaises(SystemExit):
+            main(["--diff", str(ROOT / "reviewer/example.diff"), "--provider", "openrouter", "--dry-run"])
 
 
 if __name__ == "__main__":

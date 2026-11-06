@@ -132,7 +132,7 @@ the profile's name, version, and SHA-256.
 find-verify with a learned profile: `self_improving/profiles/<model>.json` for the
 model in `config.toml`. `python -m benchmark improve` learns it from the agent's own
 benchmark failures and writes it there when its loop finishes (see the
-[root README](../README.md#improving-the-reviewer)). A model with no learned profile
+[benchmark README](../benchmark/README.md#the-improvement-loop)). A model with no learned profile
 yet runs on find-verify's default profile; `metadata.learned_profile` says which.
 Because the loop learns from the benchmark's cases, this agent's benchmark score is a
 fit to those cases, not a held-out estimate.

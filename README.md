@@ -6,27 +6,48 @@ This repository has two parts, plus their tests:
   reviewer sees each PR's diff and reports any vulnerability the PR introduces;
   findings are graded against known advisory targets and scored. The cases are in
   `benchmark/data/cases.json`, built from `manifest.json` and `targets.json` there.
-- **`reviewer/`**: a baseline single-call reviewer that sends the diff to a model.
+- **`reviewer/`**: two reviewers. `baseline` (the default) sends the diff to a model in
+  one call. `find-verify` lets a finder look up any code it needs, then has a
+  separate verifier check each candidate in the code before it is reported.
   See [reviewer/README.md](reviewer/README.md).
 - **`tests/`**: unit tests for both, and `empty_agent.py`, a protocol smoke test.
 
 Python 3.11+ and Git are required. Neither part has third-party runtime dependencies.
 
-## Baseline result
+## Results
 
-The bundled reviewer with Cerebras `gpt-oss-120b`, one model call per PR, reviewed all
-67 cases in 91 seconds. One case failed on invalid model JSON and counts as missed.
+Both reviewers ran on all 67 cases with Cerebras `gpt-oss-120b`.
 
-| | All | Dev (40) | Held-out (27) |
-|---|---|---|---|
-| Known bugs found (recall) | 26 of 37 (70%) | 14 of 21 (67%) | 12 of 16 (75%) |
-| Precision | 29% | 26% | 33% |
-| Clean PRs with a false alarm | 29 of 40 (73%) | 20 of 26 | 9 of 14 |
+| | Single-call `baseline` | `find-verify` |
+|---|---|---|
+| Known bugs found (recall) | 26 of 37 (70%) | 25 of 37 (68%) |
+| Precision | 29% | **48%** |
+| F1 | 0.41 | **0.56** |
+| False findings | 62 | **24** |
+| Clean PRs with a false alarm | 29 of 40 (73%) | **11 of 40 (28%)** |
+| Failed cases | 1 (invalid JSON) | 0 |
+| Model calls per PR (median) | 1 | 13 |
+| Time for all 67 cases | 91 s | about 13 min (median 8 s per PR) |
 
-It finds 77% of bugs in PRs that added them and 60% in reversed fixes, but raises a
-false alarm on most clean PRs. Grading: Jev drafted all 106 decisions; the 13 it left
-unresolved were decided by Claude, approved by the user, under the strict rule
-below. No independent human checked the grades. This is one run at temperature 0.
+By split:
+
+| | Baseline dev (40) | find-verify dev | Baseline held-out (27) | find-verify held-out |
+|---|---|---|---|---|
+| Recall | 14 of 21 (67%) | 15 of 21 (71%) | 12 of 16 (75%) | 10 of 16 (62%) |
+| Precision | 26% | 45% | 33% | 53% |
+| Clean PRs with a false alarm | 20 of 26 | 8 of 26 | 9 of 14 | 3 of 14 |
+
+The verifier works as a filter. It removes over 60% of the baseline's false
+findings and of its false alarms on clean PRs, for about the same recall (two
+held-out bugs fewer, one dev bug more). It also confirmed 21 real issues outside the
+labelled targets (`also_valid`), against the baseline's 16. Both reviewers find 77%
+of bugs in PRs that added them; on reversed fixes the baseline finds 60% and
+find-verify 53%.
+
+Grading: Jev drafted every decision (106 for the baseline, 73 for find-verify). The
+ones it left unresolved (13 and 5) were decided by Claude under the strict rule
+below; the user approved the baseline's. No independent human checked the grades.
+Each column is one run at temperature 0, and repeated runs vary by a few bugs.
 
 ## The PR suite
 
@@ -59,6 +80,8 @@ python -m benchmark build
 # 2. Run a reviewer: any command that reads one request on stdin and prints findings JSON.
 #    This runs the bundled reviewer; pass its folder's absolute path.
 python -m benchmark run --split dev --model cerebras/gpt-oss-120b --out .bench/run.json -- python C:\absolute\path\reviewer --provider cerebras
+#    The find-verify reviewer uses the lookup command; give it a longer timeout.
+python -m benchmark run --split dev --model cerebras/gpt-oss-120b/find-verify --timeout 420 --out .bench/fv.json -- python C:\absolute\path\reviewer --provider cerebras --strategy find-verify
 
 # 3. Grade every finding (automatically with Jev, or by hand from a template), then score.
 python -m benchmark judge --results .bench/run.json --out .bench/grades.json

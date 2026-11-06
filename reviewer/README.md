@@ -1,4 +1,67 @@
-# Single-call security reviewer baseline
+# Security PR reviewers
+
+Two strategies share the same providers, input protocol, and output format:
+
+- `--strategy baseline` (default): one model call on the diff. Documented below under
+  [Single-call baseline](#single-call-baseline).
+- `--strategy find-verify`: a finder that can look up any code, then one verifier per
+  candidate. Only candidates the verifier confirms in the code are reported.
+
+Results on the benchmark are in the [root README](../README.md#results).
+
+## find-verify
+
+1. **Find.** The finder reads the diff, with every line labelled `[base N]` or
+   `[head N]`, and calls `lookup` whenever the diff is not enough: callers, routes,
+   where input comes from, guards, sanitizers. It may run several lookups per turn.
+   It ends by calling `report` with its candidates. A candidate must point at a line
+   in the diff; if one does not, the finder is told which and can fix its report.
+2. **Verify.** Each candidate gets its own verifier, with the same lookup tool and a
+   fresh conversation; up to three run in parallel. It confirms only if code it cites
+   shows that an attacker controls the input, the input reaches the operation with no
+   effective guard, the operation has the claimed impact, and this diff introduced or
+   weakened it. Otherwise it rejects (quoting the guard or line) or says uncertain.
+3. **Report.** Confirmed candidates become findings, with the verifier's reasoning
+   appended to the description and its citations as evidence.
+
+```powershell
+# A local diff with its base and head source trees (keep them unchanged during the review).
+python -m reviewer --strategy find-verify --provider cerebras --diff change.diff --base-dir C:\sources\base --head-dir C:\sources\head
+
+# A public GitHub PR: reads files at the pinned head and merge-base revisions (no search).
+python -m reviewer --strategy find-verify --provider cerebras --pr https://github.com/OWNER/REPO/pull/123 --out .reviews/pr-123.json
+
+# The finder's exact first request, without a model call.
+python -m reviewer --strategy find-verify --diff reviewer/example.diff --dry-run
+```
+
+**Checks done in code, not by a model.** A citation must quote one line exactly as
+the verifier saw it, in the diff or its own lookup results; otherwise the verifier is
+told what is wrong (never observed, quote not found, several lines joined) and can
+fix it. A confirmation must cite at least one line the diff changed. Lookups go
+through `code_access.py`: the benchmark's lookup command (reconstructed, never run as
+given), local trees, or pinned GitHub revisions. They hide `.git`, `.env*`, and
+changelogs, and return specific errors such as "no such file" or "invalid search
+pattern" with commit ids removed. No model-supplied command is executed.
+
+**Robustness.** Models act only through native tool calls. A reply in plain text gets
+a reminder instead of failing the review; an identical repeated lookup is refused
+with a pointer to the earlier result. HTTP 429 responses are retried after the
+provider's `Retry-After`, at most three attempts and never past the review deadline;
+other errors are not retried. There is no lookup quota: each finder and verifier
+has a call cap (`--finder-calls 20`, `--verifier-calls 12`), the review has a global
+cap (`--max-calls 150`) and deadline (`--review-timeout 300`), and the last turns
+are told to finish. At most 10 candidates are verified; any beyond that are listed
+as `unverified`.
+
+**Output.** `findings` is benchmark-compatible. The output also keeps every
+`candidates` entry, each `verifications` verdict with its reason, citations,
+lookups, and stop reason, and the finder's lookups. `metadata.status` is `partial`
+when a verifier was uncertain or something hit a cap, and `error` (exit code 2) when
+a model call failed outright, so the benchmark counts it as a failed case.
+`--record` saves every request and response.
+
+## Single-call baseline
 
 This baseline sends one unified diff to
 `nvidia/nemotron-3-ultra-550b-a55b:free` through OpenRouter, asks for security

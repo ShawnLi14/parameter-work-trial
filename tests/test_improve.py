@@ -112,6 +112,7 @@ class EditTests(unittest.TestCase):
         better["objective"] = objective(better)
         self.assertTrue(keep(better, start, start, 3))
         self.assertFalse(keep(start, start, start, 3))  # no F1 gain
+        self.assertTrue(keep({**better, "failed_cases": 1}, start, start, 3))  # a timeout alone is no veto
         report = {"bugs": [{"case_id": "h001", "split": "dev", "stage": "not_proposed", "title": "Command injection",
                             "mechanism": "m", "verifier_reasons": []},
                            {"case_id": "h009", "split": "holdout", "stage": "not_proposed", "title": "SSRF",

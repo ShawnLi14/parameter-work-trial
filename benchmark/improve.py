@@ -176,10 +176,13 @@ def objective(summary):
 
 
 def keep(candidate, incumbent, start, recall_slack):
-    """Keep an edit only if F1 rises and bugs found stays within the slack of the start."""
+    """Keep an edit only if F1 rises and bugs found stays within the slack of the start.
+
+    A failed case (for example a timeout) already counts as missed bugs in both
+    numbers, so it does not veto an edit on its own.
+    """
     return (candidate["objective"] > incumbent["objective"]
-            and candidate["true_positives"] >= start["true_positives"] - recall_slack
-            and not candidate["failed_cases"])
+            and candidate["true_positives"] >= start["true_positives"] - recall_slack)
 
 
 def summarize(scored):
@@ -199,7 +202,10 @@ def evaluate(profile_path, out_dir, data, split="dev", label="eval", provider="c
                    "--provider", provider, "--model", model, "--strategy", "find-verify",
                    "--profile", str(Path(profile_path).resolve())]
         print(f"  running {split} for {Path(profile_path).name} ...", flush=True)
-        subprocess.run(command, cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+        # The runner exits 1 when any case fails; failed cases are scored as missed.
+        subprocess.run(command, cwd=ROOT, stdout=subprocess.DEVNULL)
+        if not results_path.exists():
+            raise RuntimeError(f"benchmark run wrote no results for {Path(profile_path).name}")
     return grade_and_triage(read_json(results_path), out_dir, data, label)
 
 
@@ -333,18 +339,24 @@ def run_loop(args):
         report = read_json(home / Path(state["incumbent"]).stem / "dev-triage.json")
         history = [{"round": r["round"], "edit": r.get("edit_summary"), "accepted": r["accepted"],
                     "objective": r.get("summary", {}).get("objective")} for r in state["rounds"]]
-        print(f"round {number}: proposing an edit ...", flush=True)
-        try:
-            proposal, profile = propose(incumbent, report, history, banned, provider=args.provider,
-                                        model=args.optimizer_model or args.model)
-        except ValueError as error:
-            state["rounds"].append({"round": number, "accepted": False, "error": str(error)})
-            write_json(state_path, state)
-            print(f"  no valid edit: {error}")
-            continue
         name = f"p{number:03}.json"
-        write_json(home / name, profile)
-        write_json(home / f"p{number:03}-proposal.json", proposal)
+        saved = home / f"p{number:03}-proposal.json"
+        if saved.exists() and (home / name).exists():
+            # An interrupted round resumes with its saved edit and any results already run.
+            proposal, profile = read_json(saved), read_json(home / name)
+            print(f"round {number}: resuming its saved edit", flush=True)
+        else:
+            print(f"round {number}: proposing an edit ...", flush=True)
+            try:
+                proposal, profile = propose(incumbent, report, history, banned, provider=args.provider,
+                                            model=args.optimizer_model or args.model)
+            except ValueError as error:
+                state["rounds"].append({"round": number, "accepted": False, "error": str(error)})
+                write_json(state_path, state)
+                print(f"  no valid edit: {error}")
+                continue
+            write_json(home / name, profile)
+            write_json(saved, proposal)
         print(f"  edit: {describe(proposal['edit'])}")
         summary, _ = evaluate(home / name, home / f"p{number:03}", data, label="dev", provider=args.provider, model=args.model)
         accepted = keep(summary, state["incumbent_summary"], state["start_summary"], args.recall_slack)

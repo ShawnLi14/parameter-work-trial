@@ -1,0 +1,33 @@
+# Settings for the reviewer agents, the benchmark, and the improvement loop.
+# API keys go in .env (see .env.example). Every setting is optional; these are the defaults.
+
+[model]
+provider = "anthropic"        # "anthropic" (Claude) or "cerebras"
+name = ""                     # empty: the provider's default, claude-haiku-5-5 or gpt-oss-120b
+reasoning_effort = "medium"   # low, medium, or high
+max_tokens = 16384            # output allowance per model call, including reasoning
+timeout = 240                 # seconds per model request
+
+[review]
+max_input_chars = 200000      # larger PR contexts fail instead of being clipped
+record_dir = ""               # e.g. ".reviews" to save every review's model calls there
+
+[find_verify]                 # also used by the self-improving reviewer
+finder_calls = 20             # model-call cap for the finder
+specialist_calls = 14         # model-call cap per specialist
+verifier_calls = 12           # model-call cap per verifier
+max_candidates = 10           # candidates beyond this are listed as unverified
+concurrency = 3               # hunters and verifiers running at once
+max_calls = 150               # model calls per review, in total
+review_timeout = 300          # seconds before a review stops starting new work
+max_context_chars = 300000    # per-call message size limit
+
+[benchmark]
+split = "all"                 # cases `python -m benchmark run` reviews: all, dev, or holdout
+timeout = 420                 # seconds per case
+
+[improve]
+rounds = 3                    # rounds per `python -m benchmark improve`
+recall_slack = 3              # bugs found may fall at most this far below the starting profile
+split = "all"                 # cases the loop learns from: all or dev
+optimizer_model = ""          # empty: the reviewer's model

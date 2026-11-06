@@ -1,81 +1,19 @@
-"""Exactly one model request, with no retrieval, repair pass, or semantic scorer."""
+"""Single-call reviewer: exactly one model request on the diff, with no retrieval or repair pass."""
 
-import hashlib
 import json
-from pathlib import PurePosixPath
 import time
 
-from . import __version__
-from .http import request_json
+from .. import __version__
+from ..providers import DEFAULT_MODEL, DEFAULT_PROVIDER, PROVIDERS, request_settings, send
+from ..tools import sha256, validate_findings
 from .prompt import PROMPT_VERSION, SYSTEM_PROMPT
-
-DEFAULT_PROVIDER = "cerebras"
-DEFAULT_MODEL = "gpt-oss-120b"
-# Requests are built in the OpenAI chat-completions shape, which Cerebras speaks natively.
-# Claude requests are converted to the Messages API by reviewer/claude.py.
-PROVIDERS = {
-    "cerebras": {"url": "https://api.cerebras.ai/v1", "key": "CEREBRAS_API_KEY", "model": DEFAULT_MODEL},
-    "anthropic": {"url": "https://api.anthropic.com/v1", "key": "ANTHROPIC_API_KEY", "model": "claude-haiku-5-5"},
-}
-
-
-def send(provider, payload, api_key, timeout):
-    """One model request in chat-completions shape, to whichever provider is selected."""
-    if provider == "anthropic":
-        from .claude import complete
-        return complete(payload, api_key, timeout)
-    return request_json(PROVIDERS[provider]["url"] + "/chat/completions", payload=payload, timeout=timeout,
-                        headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"})
-
-
-def sha256(value):
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
-
 
 def build_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effort="medium", provider=DEFAULT_PROVIDER):
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": json.dumps(context, ensure_ascii=False, sort_keys=True)},
     ]
-    if provider == "anthropic":
-        # Current Claude models reject sampling parameters; effort controls thinking.
-        return {"model": model, "messages": messages, "max_completion_tokens": max_tokens,
-                "reasoning_effort": "low" if reasoning_effort == "none" else reasoning_effort, "stream": False}
-    # gpt-oss always reasons; "low" is the closest setting to none.
-    return {"model": model, "messages": messages, "temperature": 0,
-            "max_completion_tokens": max_tokens,
-            "reasoning_effort": "low" if reasoning_effort == "none" else reasoning_effort,
-            "stream": False}
-
-
-def validate_findings(value):
-    if not isinstance(value, dict) or not isinstance(value.get("findings"), list):
-        raise ValueError("Model output must be an object containing a findings list")
-    findings = []
-    for i, finding in enumerate(value["findings"]):
-        prefix = f"Finding {i + 1}"
-        if not isinstance(finding, dict):
-            raise ValueError(f"{prefix} must be an object")
-        for key in ("title", "description", "path"):
-            if not isinstance(finding.get(key), str) or not finding[key].strip():
-                raise ValueError(f"{prefix} requires a non-empty {key}")
-        path = finding["path"]
-        if (PurePosixPath(path).is_absolute() or ".." in PurePosixPath(path).parts
-                or "\\" in path or ":" in path or path in {".", ""}):
-            raise ValueError(f"{prefix} path must be relative with forward slashes")
-        if type(finding.get("line")) is not int or finding["line"] < 1:
-            raise ValueError(f"{prefix} requires a positive integer line")
-        if finding.get("side", "head") not in ("base", "head"):
-            raise ValueError(f"{prefix} side must be base or head")
-        if finding.get("severity") not in ("critical", "high", "medium", "low"):
-            raise ValueError(f"{prefix} requires a valid severity")
-        evidence = finding.get("evidence")
-        if not isinstance(evidence, list) or not evidence or not all(isinstance(e, str) and e.strip() for e in evidence):
-            raise ValueError(f"{prefix} requires non-empty evidence strings")
-        findings.append({key: finding[key] for key in (
-            "title", "severity", "description", "path", "line", "evidence")}
-            | {"side": finding.get("side", "head")})
-    return findings
+    return {**request_settings(model, max_tokens, reasoning_effort, provider), "messages": messages}
 
 
 def parse_response(response):

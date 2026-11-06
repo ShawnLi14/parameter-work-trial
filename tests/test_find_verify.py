@@ -1,15 +1,17 @@
 import contextlib
 import io
 import json
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
 from benchmark.runner import validate_output
-from reviewer.cli import main
+from reviewer.run import main
 from reviewer.find_verify import (FindVerifyLimits, check_candidate, finder_payload, load_profile, profile_sha256,
                                   review, verifier_prompt)
 from reviewer.evidence import Evidence
-from helpers import BASE_LINE, CONTEXT, DIFF, HEAD_LINE, INPUT_LINE, ROOT, FakeAccess, sent, tool_reply, tools
+from helpers import BASE_LINE, CONTEXT, DIFF, HEAD_LINE, INPUT_LINE, ROOT, FakeAccess, cerebras_settings, sent, tool_reply, tools
 from reviewer.inputs import context_from_request
 
 CANDIDATE = {"title": "Command injection", "severity": "high", "path": "app.py", "line": 5, "side": "head",
@@ -31,7 +33,7 @@ def lookup(path="routes.py", start=1):
 
 
 def run(replies, access=None, **limits):
-    with patch("reviewer.baseline.request_json", side_effect=replies) as client:
+    with patch("reviewer.providers.request_json", side_effect=replies) as client:
         result = review(CONTEXT, "key", access=access or FakeAccess(), limits=FindVerifyLimits(concurrency=1, **limits))
     return result, client
 
@@ -147,7 +149,7 @@ class FindVerifyTests(unittest.TestCase):
             {"name": "crypto", "focus": "Weak cryptography.", "guidance": "Look for ECB.", "triggers": ["Cipher"]}]}
         other = {**CANDIDATE, "title": "Argument injection", "line": 4}
         replies = [tools(report(CANDIDATE)), tools(report(CANDIDATE, other)), tools(verdict()), tools(verdict("rejected", [HEAD_LINE]))]
-        with patch("reviewer.baseline.request_json", side_effect=replies) as client:
+        with patch("reviewer.providers.request_json", side_effect=replies) as client:
             result = review(CONTEXT, "key", access=FakeAccess(), limits=FindVerifyLimits(concurrency=1), profile=profile)
         self.assertEqual({"finder", "injection"}, set(result["hunters"]))  # crypto's trigger did not match
         self.assertIn("specialist reviewer for one class of vulnerability: injection", sent(client, 1)["messages"][0]["content"])
@@ -158,7 +160,7 @@ class FindVerifyTests(unittest.TestCase):
 
     def test_profile_edits_change_the_verifier_prompt(self):
         profile = {**load_profile(), "verifier_criteria": "Confirm only with a quoted sink."}
-        with patch("reviewer.baseline.request_json", side_effect=[tools(report(CANDIDATE)), tools(verdict())]) as client:
+        with patch("reviewer.providers.request_json", side_effect=[tools(report(CANDIDATE)), tools(verdict())]) as client:
             review(CONTEXT, "key", access=FakeAccess(), limits=FindVerifyLimits(concurrency=1), profile=profile)
         self.assertIn("Confirm only with a quoted sink.", sent(client, 1)["messages"][0]["content"])
 
@@ -167,15 +169,46 @@ class FindVerifyTests(unittest.TestCase):
         self.assertIn("(d) this diff introduced or weakened it (cite a changed line).", prompt)
         self.assertEqual([], load_profile()["specialists"])
 
-    def test_cli_dry_run_shows_finder_payload_without_network(self):
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout), patch("reviewer.baseline.request_json") as network:
-            code = main(["--diff", str(ROOT / "reviewer/example.diff"), "--strategy", "find-verify", "--dry-run"])
-        self.assertEqual(0, code)
-        payload = json.loads(stdout.getvalue())
+    def test_finder_payload_needs_no_network(self):
+        with patch("reviewer.providers.request_json") as network:
+            payload = finder_payload(CONTEXT, "gpt-oss-120b", provider="cerebras")
         self.assertEqual("required", payload["tool_choice"])
         self.assertIn("Find the security vulnerabilities", payload["messages"][0]["content"])
         network.assert_not_called()
+
+    def test_agents_review_a_diff_file_with_settings_from_config(self):
+        for agent in ("find-verify", "self-improving"):
+            stdout = io.StringIO()
+            with self.subTest(agent=agent), patch("reviewer.run.load_settings", return_value=cerebras_settings()), \
+                    patch.dict("os.environ", {"CEREBRAS_API_KEY": "k"}), contextlib.redirect_stdout(stdout), \
+                    patch("reviewer.providers.request_json", side_effect=[tools(report(CANDIDATE)), tools(verdict())]):
+                self.assertEqual(0, main(agent, [str(ROOT / "reviewer/example.diff")]))
+            output = json.loads(stdout.getvalue())
+            self.assertEqual(1, len(output["findings"]))
+            self.assertEqual("gpt-oss-120b", output["metadata"]["requested_model"])
+
+    def test_profile_override_is_used_by_both_profile_agents(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "p.json"
+            path.write_text(json.dumps({**load_profile(), "verifier_criteria": "Confirm only with a quoted sink."}))
+            with patch("reviewer.run.load_settings", return_value=cerebras_settings()), \
+                    patch.dict("os.environ", {"CEREBRAS_API_KEY": "k", "REVIEWER_PROFILE": str(path)}), \
+                    contextlib.redirect_stdout(io.StringIO()), \
+                    patch("reviewer.providers.request_json", side_effect=[tools(report(CANDIDATE)), tools(verdict())]) as client:
+                main("find-verify", [str(ROOT / "reviewer/example.diff")])
+        self.assertIn("Confirm only with a quoted sink.", sent(client, 1)["messages"][0]["content"])
+
+    def test_self_improving_uses_the_learned_profile_for_its_model(self):
+        from reviewer import self_improving
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(self_improving, "PROFILES", Path(directory)):
+                profile, learned = self_improving.load("some-model")
+                self.assertFalse(learned)
+                self.assertEqual(load_profile(), profile)
+                (Path(directory) / "some-model.json").write_text(json.dumps({**load_profile(), "name": "learned"}))
+                profile, learned = self_improving.load("some-model")
+        self.assertTrue(learned)
+        self.assertEqual("learned", profile["name"])
 
 
 if __name__ == "__main__":

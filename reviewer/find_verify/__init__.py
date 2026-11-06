@@ -14,14 +14,15 @@ import re
 import threading
 import time
 
-from .baseline import DEFAULT_MODEL, DEFAULT_PROVIDER, PROVIDERS, build_payload, send, sha256, validate_findings
-from .code_access import validate_action
-from .evidence import Evidence
-from .tools import (BASE, CITATION, CITATION_RULES, LOOKUP_TOOL, RATE_LIMIT_ATTEMPTS, NoToolCall,
-                    check_citations, echo, model_context, rate_limit_wait, shown, tool_calls)
+from ..code_access import validate_action
+from ..evidence import Evidence
+from ..providers import DEFAULT_MODEL, DEFAULT_PROVIDER, PROVIDERS, request_settings, send
+from ..tools import (BASE, CITATION, CITATION_RULES, LOOKUP_TOOL, RATE_LIMIT_ATTEMPTS, NoToolCall,
+                     check_citations, echo, model_context, rate_limit_wait, shown, sha256, tool_calls,
+                     validate_findings)
 
 VERSION = "find-verify-v2"
-DEFAULT_PROFILE = Path(__file__).resolve().parent / "profiles" / "default.json"
+DEFAULT_PROFILE = Path(__file__).resolve().parent / "profile.json"
 
 LOOKUP_HELP = """
 lookup reads, searches, or lists repository code on side base (before the PR) or head
@@ -166,7 +167,7 @@ def finder_messages(context, system):
 def finder_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effort="medium", provider=DEFAULT_PROVIDER,
                    profile=None):
     profile = profile or load_profile()
-    payload = build_payload(context, model, max_tokens, reasoning_effort, provider)
+    payload = request_settings(model, max_tokens, reasoning_effort, provider)
     return {**payload, "messages": finder_messages(context, hunters(profile, context["diff"])[0][1]),
             "tools": FINDER_TOOLS, "tool_choice": "required", "parallel_tool_calls": True}
 
@@ -198,7 +199,7 @@ def review(context, api_key, *, access, model=DEFAULT_MODEL, max_tokens=16384,
     lock = threading.Lock()
     trace = {"prompt_version": VERSION, "limits": asdict(limits), "calls": []}
     usages = []
-    prototype = build_payload(context, model, max_tokens, reasoning_effort, provider)
+    prototype = request_settings(model, max_tokens, reasoning_effort, provider)
     diff_ledger = Evidence(context["diff"])
     if not diff_ledger.changed:
         raise ValueError("No reviewable changed text lines; binary or unsupported diff paths")

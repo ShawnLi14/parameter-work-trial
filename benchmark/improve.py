@@ -1,24 +1,33 @@
-"""Self-improvement loop for the find-verify reviewer, inspired by AgentFlow's harness search.
+"""Self-improvement loop for the self-improving reviewer, inspired by AgentFlow's harness search.
 
-Each round: evaluate the incumbent profile on the dev split, attribute every failure to a
-stage (benchmark/triage.py), ask an optimizer model for ONE edit to the profile, reject
-edits that name benchmark repositories, files, or functions, evaluate the edited profile
-on dev, and keep it only if dev F1 improves while bugs found stays within --recall-slack
-of the starting profile (so recall cannot erode round by round).
+    python -m benchmark improve
+
+The reviewer's model and every loop setting come from config.toml ([model], [improve]).
+The loop learns a find-verify profile for that model and, when it finishes, writes the
+best one to reviewer/self_improving/profiles/<model>.json, which the self-improving
+agent then uses. Its rounds are kept in .bench/runs/<model>/self-improving/loop/; run the
+command again to resume, or to keep improving from the learned profile.
+
+Each round: evaluate the incumbent profile, attribute every failure to a stage
+(benchmark/triage.py), ask an optimizer model for ONE edit to the profile, reject edits
+that name benchmark repositories, files, or functions, evaluate the edited profile, and
+keep it only if F1 improves while bugs found stays within improve.recall_slack of the
+starting profile (so recall cannot erode round by round).
 
   false findings / verifier rejections -> edit the verifier criteria
   bugs never proposed                  -> update a specialist, or add a new one
   bugs found but mislocated or merged  -> edit the finder guidance
 
-The holdout split is never shown to the optimizer and never run inside the loop; use
---evaluate-holdout on a finished profile.
-
-    python -m benchmark.improve --name r1 --rounds 5
-    python -m benchmark.improve --name r1 --evaluate-holdout .bench/improve/r1/p003.json
+By default the loop runs on the whole benchmark (improve.split = "all"): the held-out
+projects contain mostly different kinds of bug, so tuning on dev cannot transfer to them.
+The optimizer then sees every labelled bug, so scores measure how well the profile fits
+this benchmark, not how it would do on unseen pull requests. With improve.split = "dev",
+the held-out cases are never shown to the optimizer.
 """
 
-import argparse
 import copy
+import os
+import shutil
 import json
 from pathlib import Path
 import re
@@ -33,7 +42,8 @@ from .triage import triage
 
 ROOT = Path(__file__).resolve().parents[1]
 SUITE = ROOT / "benchmark/data/cases.json"
-DEFAULT_PROFILE = ROOT / "reviewer/profiles/default.json"
+DEFAULT_PROFILE = ROOT / "reviewer/find_verify/profile.json"
+RUNS = ROOT / ".bench" / "runs"
 EDIT_KINDS = ("set_verifier_criteria", "set_finder_guidance", "add_specialist", "update_specialist", "remove_specialist")
 
 OPTIMIZER = """You improve an automated security reviewer for pull requests.
@@ -48,7 +58,7 @@ The reviewer has two stages, configured by an editable PROFILE:
 2. A verifier checks each candidate in the code and confirms, rejects, or is uncertain,
    following profile.verifier_criteria. Only confirmed candidates are reported.
 
-You get the results of the CURRENT profile on a development set of real pull requests,
+You get the results of the CURRENT profile on a set of real pull requests,
 with every failure attributed to a stage:
 - not_proposed: a real bug no hunter proposed -> improve a specialist or add one.
 - verifier_rejected / verifier_uncertain: a real bug proposed, then wrongly dropped
@@ -191,19 +201,19 @@ def summarize(scored):
     return {k: scored.get(k) for k in keys}
 
 
-def evaluate(profile_path, out_dir, data, split="dev", label="eval", provider="cerebras", model="gpt-oss-120b"):
+def evaluate(profile_path, out_dir, data, split, label, model, timeout):
     """Run, grade, score, and triage one profile. Returns the summary dict."""
     out_dir.mkdir(parents=True, exist_ok=True)
     results_path = out_dir / f"{label}-results.json"
     if not results_path.exists():
-        command = [sys.executable, "-m", "benchmark", "run", "--split", split,
-                   "--model", f"{provider}/{model}/find-verify/{Path(profile_path).stem}", "--timeout", "420",
-                   "--out", str(results_path), "--", sys.executable, str(ROOT / "reviewer"),
-                   "--provider", provider, "--model", model, "--strategy", "find-verify",
-                   "--profile", str(Path(profile_path).resolve())]
+        command = [sys.executable, "-m", "benchmark", "run-command", "--split", split,
+                   "--model", f"{model}/find-verify/{Path(profile_path).stem}", "--timeout", str(timeout),
+                   "--out", str(results_path), "--", sys.executable, str(ROOT / "reviewer" / "find_verify")]
         print(f"  running {split} for {Path(profile_path).name} ...", flush=True)
+        # The find_verify agent reviews with this profile instead of its own.
+        environment = {**os.environ, "REVIEWER_PROFILE": str(Path(profile_path).resolve())}
         # The runner exits 1 when any case fails; failed cases are scored as missed.
-        subprocess.run(command, cwd=ROOT, stdout=subprocess.DEVNULL)
+        subprocess.run(command, cwd=ROOT, stdout=subprocess.DEVNULL, env=environment)
         if not results_path.exists():
             raise RuntimeError(f"benchmark run wrote no results for {Path(profile_path).name}")
     return grade_and_triage(read_json(results_path), out_dir, data, label)
@@ -236,9 +246,12 @@ def subset(results, case_ids):
 
 # --- optimizer ----------------------------------------------------------------------------
 
-def failures_for_optimizer(report):
-    """Dev failures only, grouped by stage; labels carry class and mechanism, not ids."""
-    bugs = [b for b in report["bugs"] if b["split"] == "dev" and b["stage"] != "found"]
+def failures_for_optimizer(report, split="dev"):
+    """Failures in the loop's split, grouped by stage; labels carry class and mechanism, not ids."""
+    def included(item):
+        return split == "all" or item["split"] == split
+
+    bugs = [b for b in report["bugs"] if included(b) and b["stage"] != "found"]
     return {
         "not_proposed": [{"case": b["case_id"], "class": b["title"], "mechanism": b["mechanism"]}
                          for b in bugs if b["stage"] == "not_proposed"],
@@ -247,7 +260,7 @@ def failures_for_optimizer(report):
                              for b in bugs if b["stage"] != "not_proposed"],
         "false_findings": [{"case": f["case_id"], "control": not f["variant"] or f["variant"] != "introduced_historical",
                             "title": f["title"], "proposed_by": f["proposed_by"], "description": f["description"][:1500]}
-                           for f in report["false_findings"] if f["split"] == "dev"],
+                           for f in report["false_findings"] if included(f)],
         "hunter_stats": report["hunters"],
     }
 
@@ -269,16 +282,16 @@ def parse_object(response):
     return value
 
 
-def propose(profile, report, history, banned, attempts=3, provider="cerebras", model="gpt-oss-120b"):
-    from reviewer.baseline import PROVIDERS, send
+def propose(profile, report, history, banned, attempts=3, provider="cerebras", model="gpt-oss-120b", split="dev"):
     from reviewer.config import load_environment
+    from reviewer.providers import PROVIDERS, send
     key = load_environment().get(PROVIDERS[provider]["key"])
     if not key:
         raise ValueError(f"Set {PROVIDERS[provider]['key']} for the optimizer")
     payload = {"model": model, "max_completion_tokens": 16384, "reasoning_effort": "high", "stream": False, "messages": [
                    {"role": "system", "content": OPTIMIZER},
                    {"role": "user", "content": json.dumps({
-                       "profile": profile, "dev_failures": failures_for_optimizer(report),
+                       "profile": profile, "failures": failures_for_optimizer(report, split),
                        "history": history}, ensure_ascii=False)}]}
     problems = []
     for _ in range(attempts):
@@ -312,31 +325,43 @@ def describe(edit):
 
 # --- loop ---------------------------------------------------------------------------------
 
-def run_loop(args):
+def run_loop(rounds=None):
+    from reviewer.config import load_settings
+    from reviewer.self_improving import profile_path
+    settings = load_settings()
+    provider, model = settings["model"]["provider"], settings["model"]["name"]
+    loop_settings, timeout = settings["improve"], settings["benchmark"]["timeout"]
+    rounds = loop_settings["rounds"] if rounds is None else rounds
     data = load(SUITE)
     banned = banned_terms(data)
-    home = ROOT / ".bench" / "improve" / args.name
+    agent_dir = RUNS / model / "self-improving"
+    home = agent_dir / "loop"
     home.mkdir(parents=True, exist_ok=True)
     state_path = home / "state.json"
     if state_path.exists():
         state = read_json(state_path)
+        split = state.get("split", "dev")  # a resumed run keeps the split it started with
     else:
-        profile = json.loads(Path(args.profile).read_text(encoding="utf-8"))
-        write_json(home / "p000.json", profile)
-        state = {"incumbent": "p000.json", "rounds": [], "catalog_sha256": digest(data)}
-        if args.seed_results:
-            # Reuse an existing dev run of the starting profile instead of re-running it.
-            dev = {c["id"] for c in data["cases"] if c["split"] == "dev"}
+        split = loop_settings["split"]
+        learned = profile_path(model)
+        start = learned if learned.exists() else DEFAULT_PROFILE
+        write_json(home / "p000.json", read_json(start))
+        state = {"incumbent": "p000.json", "rounds": [], "catalog_sha256": digest(data), "split": split,
+                 "model": model, "started_from": str(start.relative_to(ROOT))}
+        seed = RUNS / model / "find-verify" / "results.json"
+        if start == DEFAULT_PROFILE and seed.exists():
+            # find-verify's own run used this same default profile: reuse it as round 0.
+            ids = {c["id"] for c in data["cases"] if split == "all" or c["split"] == split}
             (home / "p000").mkdir(parents=True, exist_ok=True)
-            write_json(home / "p000" / "dev-results.json", subset(read_json(args.seed_results), dev))
-        summary, _ = evaluate(home / "p000.json", home / "p000", data, label="dev", provider=args.provider, model=args.model)
+            write_json(home / "p000" / f"{split}-results.json", subset(read_json(seed), ids))
+        summary, _ = evaluate(home / "p000.json", home / "p000", data, split, split, model, timeout)
         state["incumbent_summary"] = state["start_summary"] = summary
         write_json(state_path, state)
-    print(f"incumbent {state['incumbent']}: {state['incumbent_summary']}")
-    for _ in range(args.rounds):
+    print(f"{model}: incumbent {state['incumbent']}: {state['incumbent_summary']}")
+    for _ in range(rounds):
         number = len(state["rounds"]) + 1
         incumbent = read_json(home / state["incumbent"])
-        report = read_json(home / Path(state["incumbent"]).stem / "dev-triage.json")
+        report = read_json(home / Path(state["incumbent"]).stem / f"{split}-triage.json")
         history = [{"round": r["round"], "edit": r.get("edit_summary"), "accepted": r["accepted"],
                     "objective": r.get("summary", {}).get("objective")} for r in state["rounds"]]
         name = f"p{number:03}.json"
@@ -348,8 +373,8 @@ def run_loop(args):
         else:
             print(f"round {number}: proposing an edit ...", flush=True)
             try:
-                proposal, profile = propose(incumbent, report, history, banned, provider=args.provider,
-                                            model=args.optimizer_model or args.model)
+                proposal, profile = propose(incumbent, report, history, banned, provider=provider,
+                                            model=loop_settings["optimizer_model"] or model, split=split)
             except ValueError as error:
                 state["rounds"].append({"round": number, "accepted": False, "error": str(error)})
                 write_json(state_path, state)
@@ -358,18 +383,30 @@ def run_loop(args):
             write_json(home / name, profile)
             write_json(saved, proposal)
         print(f"  edit: {describe(proposal['edit'])}")
-        summary, _ = evaluate(home / name, home / f"p{number:03}", data, label="dev", provider=args.provider, model=args.model)
-        accepted = keep(summary, state["incumbent_summary"], state["start_summary"], args.recall_slack)
+        summary, _ = evaluate(home / name, home / f"p{number:03}", data, split, split, model, timeout)
+        accepted = keep(summary, state["incumbent_summary"], state["start_summary"], loop_settings["recall_slack"])
         state["rounds"].append({"round": number, "profile": name, "edit_summary": describe(proposal["edit"]),
                                 "summary": summary, "accepted": accepted,
                                 "incumbent_objective": state["incumbent_summary"]["objective"]})
         if accepted:
             state["incumbent"], state["incumbent_summary"] = name, summary
         write_json(state_path, state)
-        print(f"  dev F1 {summary['objective']} (bugs {summary['true_positives']}, false {summary['adjudicated_false_positives']}) "
-              f"vs incumbent F1 {state['rounds'][-1]['incumbent_objective']}, floor {state['start_summary']['true_positives'] - args.recall_slack} bugs: "
+        print(f"  {split} F1 {summary['objective']} (bugs {summary['true_positives']}, false {summary['adjudicated_false_positives']}) "
+              f"vs incumbent F1 {state['rounds'][-1]['incumbent_objective']}, floor {state['start_summary']['true_positives'] - loop_settings['recall_slack']} bugs: "
               f"{'ACCEPTED' if accepted else 'rejected'}")
+    publish(home, state, agent_dir, profile_path(model), split)
     print(f"final incumbent {state['incumbent']}: {state['incumbent_summary']}")
+    print(f"learned profile: {profile_path(model).relative_to(ROOT)}")
+
+
+def publish(home, state, agent_dir, destination, split):
+    """Give the self-improving agent the best profile, and keep its run beside the others."""
+    write_json(destination, read_json(home / state["incumbent"]))
+    rounds = home / Path(state["incumbent"]).stem
+    for name in ("results", "grades", "score"):
+        source = rounds / f"{split}-{name}.json"
+        if source.exists():
+            shutil.copyfile(source, agent_dir / f"{name}.json")
 
 
 def main(argv=None):
@@ -377,29 +414,7 @@ def main(argv=None):
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
-    parser = argparse.ArgumentParser(description="Improve the find-verify reviewer profile on the dev split")
-    parser.add_argument("--name", required=True, help="run name; state lives in .bench/improve/NAME")
-    parser.add_argument("--profile", default=str(DEFAULT_PROFILE), help="starting profile")
-    parser.add_argument("--rounds", type=int, default=3)
-    parser.add_argument("--recall-slack", type=int, default=3,
-                        help="bugs found may fall at most this far below the starting profile")
-    parser.add_argument("--seed-results", help="existing results of the starting profile (dev cases are reused)")
-    parser.add_argument("--evaluate-holdout", help="evaluate this profile on the holdout split and stop")
-    parser.add_argument("--provider", default="cerebras", choices=["cerebras", "anthropic"],
-                        help="provider for the reviewer runs and the optimizer")
-    parser.add_argument("--model", help="reviewer model (default: the provider's default)")
-    parser.add_argument("--optimizer-model", help="optimizer model (default: the reviewer model)")
-    args = parser.parse_args(argv)
-    from reviewer.baseline import PROVIDERS
-    args.model = args.model or PROVIDERS[args.provider]["model"]
-    if args.evaluate_holdout:
-        data = load(SUITE)
-        target = Path(args.evaluate_holdout)
-        summary, _ = evaluate(target, ROOT / ".bench" / "improve" / args.name / f"holdout-{target.stem}",
-                              data, split="holdout", label="holdout", provider=args.provider, model=args.model)
-        print(json.dumps(summary, indent=1))
-        return 0
-    run_loop(args)
+    run_loop()
     return 0
 
 

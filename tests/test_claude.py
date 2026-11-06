@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from helpers import CONTEXT
 from reviewer import claude
-from reviewer.baseline import build_payload
+from reviewer.single_call import build_payload
 
 HAS_SDK = importlib.util.find_spec("anthropic") is not None
 

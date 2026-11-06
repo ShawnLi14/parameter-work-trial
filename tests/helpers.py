@@ -45,3 +45,11 @@ def tool_reply(client, index, call_id=None):
     messages = sent(client, index)["messages"]
     replies = [m for m in messages if m["role"] == "tool" and (call_id is None or m["tool_call_id"] == call_id)]
     return json.loads(replies[-1]["content"])
+
+
+def cerebras_settings():
+    """Settings as config.toml would give them, but on Cerebras (plain HTTP, easy to mock)."""
+    from reviewer.config import load_settings
+    settings = load_settings()
+    settings["model"].update(provider="cerebras", name="gpt-oss-120b")
+    return settings

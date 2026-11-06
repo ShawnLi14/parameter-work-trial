@@ -15,7 +15,9 @@ claude = ["anthropic>=2"]
 
 [project.scripts]
 benchmark = "benchmark.cli:main"
-security-review = "reviewer.cli:main"
+review-single-call = "reviewer.run:single_call"
+review-find-verify = "reviewer.run:find_verify"
+review-self-improving = "reviewer.run:self_improving"
 
 [tool.setuptools.package-data]
 benchmark = ["data/*.json"]

@@ -6,48 +6,45 @@ This repository has two parts, plus their tests:
   reviewer sees each PR's diff and reports any vulnerability the PR introduces;
   findings are graded against known advisory targets and scored. The cases are in
   `benchmark/data/cases.json`, built from `manifest.json` and `targets.json` there.
-- **`reviewer/`**: two reviewers. `baseline` (the default) sends the diff to a model in
-  one call. `find-verify` lets a finder look up any code it needs, then has a
-  separate verifier check each candidate in the code before it is reported.
-  See [reviewer/README.md](reviewer/README.md).
+- **`reviewer/`**: three reviewer agents, each its own program, with shared code.
+  `single_call` sends the diff to a model in one call. `find_verify` lets a finder look
+  up any code it needs, then has a separate verifier check each candidate in the code.
+  `self_improving` is find-verify running on a profile it learned from its own
+  benchmark failures. See [reviewer/README.md](reviewer/README.md).
 - **`tests/`**: unit tests for both, and `empty_agent.py`, a protocol smoke test.
+- **`config.toml`**: every setting (model provider, model, limits, benchmark and loop
+  settings). API keys go in `.env`; see `.env.example`.
 
-Python 3.11+ and Git are required. Neither part has third-party runtime dependencies.
+Python 3.11+ and Git are required. The benchmark and the Cerebras provider use only the
+standard library; the Claude provider needs the `anthropic` SDK (`pip install -e ".[claude]"`).
 
 ## Results
 
-Both reviewers ran on all 67 cases with Cerebras `gpt-oss-120b`.
+Each reviewer ran on all 67 cases with each model. Grading: Jev drafted every
+decision, and the findings it left unresolved were decided by Claude under the strict
+rule below (the user approved those for the first run). No independent human checked the
+grades. Each cell is one run; repeated runs vary by a few bugs.
 
-| | Single-call `baseline` | `find-verify` |
-|---|---|---|
-| Known bugs found (recall) | 26 of 37 (70%) | 25 of 37 (68%) |
-| Precision | 29% | **48%** |
-| F1 | 0.41 | **0.56** |
-| False findings | 62 | **24** |
-| Clean PRs with a false alarm | 29 of 40 (73%) | **11 of 40 (28%)** |
-| Failed cases | 1 (invalid JSON) | 0 |
-| Model calls per PR (median) | 1 | 13 |
-| Time for all 67 cases | 91 s | about 13 min (median 8 s per PR) |
+| Reviewer | Model | Bugs found (of 37) | Precision | F1 | False findings | Clean PRs with a false alarm (of 40) |
+|---|---|---|---|---|---|---|
+| single-call | gpt-oss-120b | 26 (70%) | 29% | 0.41 | 62 | 29 |
+| find-verify | gpt-oss-120b | 25 (68%) | 48% | 0.56 | 24 | 11 |
+| single-call | claude-haiku-5-5 | **27 (73%)** | 61% | **0.67** | 17 | 3 |
+| find-verify | claude-haiku-5-5 | 23 (62%) | **68%** | 0.65 | **7** | **0** |
 
-By split:
+- **The verifier is a filter.** With gpt-oss it removes most of the single-call
+  reviewer's false findings for about the same recall. Haiku is already far more
+  precise in one call, so the verifier has less to remove, and Haiku's finder proposes
+  fewer bugs than its single call reports.
+- **Cost and speed.** With Haiku, single-call cost $0.11 for all 67 cases (median 8 s
+  per PR) and find-verify $0.62 (median 10 s, 3 model calls). Cerebras does not report
+  cost.
+- **Self-improving.** The improvement loop tunes find-verify's profile on this benchmark
+  (see [Improving the reviewer](#improving-the-reviewer)); because it learns from these
+  same cases, its score is a fit to the benchmark, not a held-out estimate.
 
-| | Baseline dev (40) | find-verify dev | Baseline held-out (27) | find-verify held-out |
-|---|---|---|---|---|
-| Recall | 14 of 21 (67%) | 15 of 21 (71%) | 12 of 16 (75%) | 10 of 16 (62%) |
-| Precision | 26% | 45% | 33% | 53% |
-| Clean PRs with a false alarm | 20 of 26 | 8 of 26 | 9 of 14 | 3 of 14 |
-
-The verifier works as a filter. It removes over 60% of the baseline's false
-findings and of its false alarms on clean PRs, for about the same recall (two
-held-out bugs fewer, one dev bug more). It also confirmed 21 real issues outside the
-labelled targets (`also_valid`), against the baseline's 16. Both reviewers find 77%
-of bugs in PRs that added them; on reversed fixes the baseline finds 60% and
-find-verify 53%.
-
-Grading: Jev drafted every decision (106 for the baseline, 73 for find-verify). The
-ones it left unresolved (13 and 5) were decided by Claude under the strict rule
-below; the user approved the baseline's. No independent human checked the grades.
-Each column is one run at temperature 0, and repeated runs vary by a few bugs.
+Runs live in `.bench/runs/<model>/<reviewer>/` (`results.json`, `grades.json` from Jev,
+`grades-reviewed.json` with the hand-decided findings, and `score.json`).
 
 ## The PR suite
 
@@ -77,15 +74,20 @@ MarkUs are held out (27 cases). Do not tune a reviewer on held-out cases.
 # 1. Fetch the pinned commits (about 540 MB) and write the suite to .bench/suite.
 python -m benchmark build
 
-# 2. Run a reviewer: any command that reads one request on stdin and prints findings JSON.
-#    This runs the bundled reviewer; pass its folder's absolute path.
-python -m benchmark run --split dev --model cerebras/gpt-oss-120b --out .bench/run.json -- python C:\absolute\path\reviewer --provider cerebras
-#    The find-verify reviewer uses the lookup command; give it a longer timeout.
-python -m benchmark run --split dev --model cerebras/gpt-oss-120b/find-verify --timeout 420 --out .bench/fv.json -- python C:\absolute\path\reviewer --provider cerebras --strategy find-verify
+# 2. Run a reviewer agent, grade it with Jev, and score it, in one step. The model, the
+#    cases (benchmark.split), and the per-case timeout come from config.toml.
+python -m benchmark evaluate single-call      # or find-verify, self-improving
 
-# 3. Grade every finding (automatically with Jev, or by hand from a template), then score.
-python -m benchmark judge --results .bench/run.json --out .bench/grades.json
-python -m benchmark score --results .bench/run.json --grades .bench/grades.json --out .bench/score.json
+# The steps separately; each works on .bench/runs/<model>/<agent>/.
+python -m benchmark run find-verify
+python -m benchmark judge find-verify
+python -m benchmark score find-verify          # uses grades-reviewed.json when it matches the run
+python -m benchmark run find-verify --case h063   # just one case
+
+# Any other reviewer: a command that reads one request on stdin and prints findings JSON.
+python -m benchmark run-command --out .bench/mine.json --model my-label -- python C:\path\to\agent.py
+python -m benchmark judge --results .bench/mine.json --out .bench/mine-grades.json
+python -m benchmark score --results .bench/mine.json --grades .bench/mine-grades.json --out .bench/mine-score.json
 ```
 
 `tests/empty_agent.py` is a protocol smoke test that always returns no findings.
@@ -198,9 +200,19 @@ catalog version and regrading.
 
 ## Improving the reviewer
 
-`python -m benchmark.improve` tunes find-verify's profile (its finder guidance,
+`python -m benchmark improve` tunes the self-improving reviewer's profile (its finder guidance,
 verifier criteria, and specialists; see [reviewer/README.md](reviewer/README.md))
-from its own dev failures, in the spirit of AgentFlow's harness search.
+from its own failures, in the spirit of AgentFlow's harness search.
+
+**It runs on the whole benchmark by default** (`improve.split = "all"` in config.toml). The held-out projects
+mostly contain different kinds of bug from the development ones (authentication,
+JWT, SSRF, and redirects are held-out only), so a profile tuned on dev cannot learn
+them. In an early run tuned on dev, a specialist that lifted dev F1 from 0.48 to 0.74
+never fired on held-out cases. The cost of training on everything: the optimizer sees
+every labelled bug, so loop scores show how well a profile fits this benchmark, not
+how it would do on unseen pull requests. `improve.split = "dev"` keeps the held-out
+cases hidden from the optimizer; afterwards, `benchmark.split = "holdout"` and
+`python -m benchmark evaluate self-improving` check the learned profile on them.
 
 **Triage.** `benchmark/triage.py` attributes every failure to the stage that caused
 it. Each labelled bug is `found`, `not_proposed` (no hunter proposed it),
@@ -212,38 +224,40 @@ all candidates, not only findings, against the labels.
 **Each round:**
 
 1. An optimizer model (the reviewer's model by default, at high reasoning) sees the current
-   profile, the dev failures grouped by stage, and earlier rounds' edits. It writes
+   profile, the failures grouped by stage, and earlier rounds' edits. It writes
    a diagnosis (stage, bottleneck, intended and actual behaviour) and exactly one
    edit: set the verifier criteria, set the finder guidance, or add, update, or
    remove a specialist. Bugs never proposed call for specialists; false findings and
    wrongly dropped bugs call for verifier changes.
 2. The edit is rejected, and the optimizer asked again (up to three attempts), if it
    is invalid or names any benchmark repository, file, function, or advisory id.
-   The banned terms come from every case, held-out included.
-3. The edited profile runs on the dev split and is graded by Jev.
-4. The edit is kept only if dev F1 improves **and** bugs found stays within
-   `--recall-slack` (default 3) of the starting profile. The floor is measured from
+   The banned terms come from every case, held-out included. This catches names,
+   not paraphrase: an optimizer that sees the labelled mechanisms can still describe
+   them closely, so the F1 check below is what decides.
+3. The edited profile runs on the loop's cases and is graded by Jev.
+4. The edit is kept only if F1 improves **and** bugs found stays within
+   `improve.recall_slack` (default 3) of the starting profile. The floor is measured from
    the start, not the last round, so recall cannot erode a little each round.
 
 ```powershell
-python -m benchmark.improve --name run1 --rounds 3
-# On Claude (run with a Python that has the anthropic SDK); --optimizer-model picks another optimizer:
-python -m benchmark.improve --name run2 --rounds 3 --provider anthropic --model claude-haiku-5-5
-# Reuse an existing full run's dev cases as round 0 instead of re-running them:
-python -m benchmark.improve --name run1 --rounds 3 --seed-results .bench/fv-full-run.json
-# Evaluate a finished profile on the held-out split (never done inside the loop):
-python -m benchmark.improve --name run1 --evaluate-holdout .bench/improve/run1/p002.json
+python -m benchmark improve
 ```
 
-Everything is saved under `.bench/improve/NAME/`: each profile, the optimizer's
-proposal, and the dev results, grades, score, and triage per round, plus
-`state.json` with the incumbent. A stopped run resumes from its state.
+It improves the self-improving reviewer for the model in config.toml, for
+`improve.rounds` rounds. When it finishes it writes the best profile to
+`reviewer/self_improving/profiles/<model>.json`, which `self_improving` uses from then
+on, and copies that profile's run to `.bench/runs/<model>/self-improving/`. Running it
+again resumes an interrupted loop, or continues from the learned profile. If the model
+has no learned profile yet and find-verify has already run on it, that run is reused as
+round 0 (same default profile), saving a full benchmark run.
 
-The optimizer never sees held-out cases, and holdout runs only on request. A dev run
-takes 10 to 20 minutes, and repeated runs of one profile vary by a few bugs, so a
-small gain in one round can be noise. No loop result is reported yet: the first runs
-rejected verifier edits that cut false findings but lost too many real bugs (one
-kept 9 of 15 dev bugs).
+The rounds are kept in `.bench/runs/<model>/self-improving/loop/`: each profile, the
+optimizer's proposal, and the results, grades, score, and triage per round, plus
+`state.json` with the incumbent and the split. A stopped run resumes from its state, including a
+round interrupted after its edit was proposed.
+
+Repeated runs of one profile vary by a few bugs, so a small gain in one round can be
+noise.
 
 ## How the suite was built, and how far to trust it
 

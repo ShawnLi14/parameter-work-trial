@@ -120,6 +120,8 @@ class EditTests(unittest.TestCase):
                   "false_findings": [], "hunters": {}}
         view = failures_for_optimizer(report)
         self.assertEqual(["Command injection"], [b["class"] for b in view["not_proposed"]])  # holdout never shown
+        everything = failures_for_optimizer(report, "all")
+        self.assertEqual(["Command injection", "SSRF"], [b["class"] for b in everything["not_proposed"]])
 
 
 if __name__ == "__main__":

@@ -10,9 +10,11 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 
-from reviewer.baseline import DEFAULT_MODEL, PROVIDERS, build_payload, parse_response, review
-from reviewer.cli import main
-from reviewer.config import load_environment
+from helpers import cerebras_settings
+from reviewer.config import DEFAULTS, load_environment, load_settings
+from reviewer.providers import DEFAULT_MODEL, PROVIDERS
+from reviewer.run import main
+from reviewer.single_call import build_payload, parse_response, review
 from reviewer.http import request_bytes
 from reviewer.inputs import context_from_request, fetch_pr
 from benchmark.runner import validate_output
@@ -100,7 +102,7 @@ class ResponseTests(unittest.TestCase):
 
     def test_one_call_with_no_unsupported_json_format(self):
         traces = []
-        with patch("reviewer.baseline.request_json", return_value=completion()) as api:
+        with patch("reviewer.providers.request_json", return_value=completion()) as api:
             result = review({"diff": DIFF}, "test-secret", record=lambda trace: traces.append(json.loads(json.dumps(trace))))
         api.assert_called_once()
         payload = api.call_args.kwargs["payload"]
@@ -114,20 +116,20 @@ class ResponseTests(unittest.TestCase):
 
     def test_failure_is_recorded_without_second_call(self):
         traces = []
-        with patch("reviewer.baseline.request_json", return_value=completion("bad")) as api, self.assertRaises(ValueError):
+        with patch("reviewer.providers.request_json", return_value=completion("bad")) as api, self.assertRaises(ValueError):
             review({"diff": DIFF}, "key", record=lambda trace: traces.append(dict(trace)))
         api.assert_called_once()
         self.assertIn("error", traces[-1])
 
     def test_missing_key_makes_no_request(self):
-        with patch("reviewer.baseline.request_json") as api, self.assertRaises(ValueError):
+        with patch("reviewer.providers.request_json") as api, self.assertRaises(ValueError):
             review({"diff": DIFF}, None)
         api.assert_not_called()
 
     def test_unknown_cost_is_not_claimed_free(self):
         response = completion()
         del response["usage"]["cost"]
-        with patch("reviewer.baseline.request_json", return_value=response):
+        with patch("reviewer.providers.request_json", return_value=response):
             result = review({"diff": DIFF}, "key", model="example/paid-model")
         self.assertIsNone(result["metadata"]["cost_usd"])
         self.assertEqual(result["metadata"]["cost_source"], "unknown")
@@ -147,27 +149,32 @@ class TransportTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
-    def test_wrapper_works_from_benchmark_cwd_without_installation(self):
-        with tempfile.TemporaryDirectory() as directory:
-            process = subprocess.run([sys.executable, str(ROOT / "reviewer"), "--dry-run"],
-                                     input=json.dumps({"mode": "pr", "diff": DIFF}), cwd=directory,
-                                     capture_output=True, text=True, timeout=30)
-        self.assertEqual(process.returncode, 0, process.stderr)
-        self.assertEqual(json.loads(process.stdout)["model"], DEFAULT_MODEL)
+    def test_each_agent_folder_runs_from_any_directory_without_installation(self):
+        # An invalid request fails before any model call, so this checks imports and the runner.
+        for package in ("single_call", "find_verify", "self_improving"):
+            with self.subTest(package=package), tempfile.TemporaryDirectory() as directory:
+                process = subprocess.run([sys.executable, str(ROOT / "reviewer" / package)],
+                                         input=json.dumps({"mode": "snapshot"}), cwd=directory,
+                                         capture_output=True, text=True, timeout=60)
+                self.assertEqual(2, process.returncode, process.stderr)
+                self.assertIn("Review failed: Expected a PR request", process.stderr)
+                self.assertEqual("", process.stdout)
 
     def test_cli_output_contains_only_protocol_json(self):
         stdout = io.StringIO()
-        with patch("reviewer.cli.sys.stdin", io.StringIO(json.dumps({"mode": "pr", "diff": DIFF}))), \
+        with patch("reviewer.run.sys.stdin", io.StringIO(json.dumps({"mode": "pr", "diff": DIFF}))), \
+                patch("reviewer.run.load_settings", return_value=cerebras_settings()), \
                 patch.dict(os.environ, {"CEREBRAS_API_KEY": "test"}), \
-                patch("reviewer.baseline.request_json", return_value=completion()), contextlib.redirect_stdout(stdout):
-            code = main([])
+                patch("reviewer.providers.request_json", return_value=completion()), contextlib.redirect_stdout(stdout):
+            code = main("single-call", [])
         self.assertEqual(code, 0)
         validate_output(json.loads(stdout.getvalue()))
 
     def test_missing_key_emits_no_success_json(self):
         stdout, stderr = io.StringIO(), io.StringIO()
-        with patch.dict(os.environ, {"CEREBRAS_API_KEY": ""}), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            code = main(["--diff", str(ROOT / "reviewer/example.diff")])
+        with patch("reviewer.run.load_settings", return_value=cerebras_settings()), \
+                patch.dict(os.environ, {"CEREBRAS_API_KEY": ""}), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = main("single-call", [str(ROOT / "reviewer/example.diff")])
         self.assertEqual(code, 2)
         self.assertEqual(stdout.getvalue(), "")
         self.assertIn("CEREBRAS_API_KEY", stderr.getvalue())
@@ -177,22 +184,22 @@ class ConfigTests(unittest.TestCase):
     def test_dotenv_values_quotes_comments_and_process_precedence(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / ".env"
-            path.write_text('# comment\nCEREBRAS_API_KEY="file-key"\nREVIEW_PROVIDER=anthropic # comment\n'
+            path.write_text('# comment\nCEREBRAS_API_KEY="file-key"\nANTHROPIC_API_KEY=claude-key # comment\n'
                             "export GITHUB_TOKEN='github-key'\nIGNORED=anything\n", encoding="utf-8")
             with patch.dict(os.environ, {"CEREBRAS_API_KEY": "process-key"}, clear=True):
                 environment = load_environment(path)
             self.assertEqual(environment, {"CEREBRAS_API_KEY": "process-key",
-                                          "REVIEW_PROVIDER": "anthropic", "GITHUB_TOKEN": "github-key"})
+                                          "ANTHROPIC_API_KEY": "claude-key", "GITHUB_TOKEN": "github-key"})
 
     def test_working_directory_dotenv_is_never_loaded(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             trusted = root / "trusted.env"
-            trusted.write_text("REVIEW_PROVIDER=cerebras\n", encoding="utf-8")
-            (root / ".env").write_text("REVIEW_PROVIDER=attacker\n", encoding="utf-8")
+            trusted.write_text("GITHUB_TOKEN=trusted\n", encoding="utf-8")
+            (root / ".env").write_text("GITHUB_TOKEN=attacker\n", encoding="utf-8")
             with patch("reviewer.config.ENV_PATH", trusted), patch.dict(os.environ, {}, clear=True), \
                     contextlib.chdir(root):
-                self.assertEqual(load_environment()["REVIEW_PROVIDER"], "cerebras")
+                self.assertEqual(load_environment()["GITHUB_TOKEN"], "trusted")
 
     def test_invalid_config_does_not_echo_secrets(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -222,7 +229,7 @@ class ProviderTests(unittest.TestCase):
             calls.append((url, kwargs))
             return {"id": "c1", "model": "gpt-oss-120b",
                     "choices": [{"finish_reason": "stop", "message": {"content": '{"findings": []}'}}]}
-        with patch("reviewer.baseline.request_json", fake):
+        with patch("reviewer.providers.request_json", fake):
             result = review({"diff": DIFF}, "csk-test", model="gpt-oss-120b", provider="cerebras")
         url, kwargs = calls[0]
         self.assertEqual("https://api.cerebras.ai/v1/chat/completions", url)
@@ -245,15 +252,23 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual("security-review-baseline", seen[0].get_header("User-agent"))
         self.assertEqual("Bearer x", seen[0].get_header("Authorization"))
 
-    def test_review_provider_setting_picks_the_default_model(self):
-        for provider, model in (("anthropic", "claude-haiku-5-5"), ("cerebras", "gpt-oss-120b")):
-            stdout = io.StringIO()
-            with self.subTest(provider=provider), patch.dict(os.environ, {"REVIEW_PROVIDER": provider}), \
-                    contextlib.redirect_stdout(stdout):
-                self.assertEqual(0, main(["--diff", str(ROOT / "reviewer/example.diff"), "--dry-run"]))
-            self.assertEqual(model, json.loads(stdout.getvalue())["model"])
-        with self.assertRaises(SystemExit):
-            main(["--diff", str(ROOT / "reviewer/example.diff"), "--provider", "openrouter", "--dry-run"])
+    def test_settings_come_from_config_toml_with_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.toml"
+            self.assertEqual("claude-haiku-5-5", load_settings(path)["model"]["name"])  # no file: all defaults
+            path.write_text('[model]\nprovider = "cerebras"\n[find_verify]\nverifier_calls = 5\n', encoding="utf-8")
+            settings = load_settings(path)
+            self.assertEqual(("cerebras", "gpt-oss-120b"), (settings["model"]["provider"], settings["model"]["name"]))
+            self.assertEqual(5, settings["find_verify"]["verifier_calls"])
+            self.assertEqual(DEFAULTS["find_verify"]["finder_calls"], settings["find_verify"]["finder_calls"])
+            for bad in ('[model]\nprovider = "openrouter"\n', '[model]\nmodle = "x"\n', '[extra]\na = 1\n',
+                        '[find_verify]\nverifier_calls = "five"\n'):
+                path.write_text(bad, encoding="utf-8")
+                with self.subTest(bad=bad), self.assertRaises(ValueError):
+                    load_settings(path)
+
+    def test_repository_config_matches_the_defaults(self):
+        self.assertEqual({**DEFAULTS["model"], "name": "claude-haiku-5-5"}, load_settings()["model"])
 
 
 if __name__ == "__main__":

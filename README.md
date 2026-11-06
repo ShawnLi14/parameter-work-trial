@@ -29,8 +29,12 @@ grades. Each cell is one run; repeated runs vary by a few bugs.
 |---|---|---|---|---|---|---|
 | single-call | gpt-oss-120b | 26 (70%) | 29% | 0.41 | 62 | 29 |
 | find-verify | gpt-oss-120b | 25 (68%) | 48% | 0.56 | 24 | 11 |
-| single-call | claude-haiku-5-5 | **27 (73%)** | 61% | **0.67** | 17 | 3 |
-| find-verify | claude-haiku-5-5 | 23 (62%) | **68%** | 0.65 | **7** | **0** |
+| single-call | claude-haiku-5-5 | **27 (73%)** | 61% | 0.67 | 17 | 3 |
+| find-verify | claude-haiku-5-5 | 23 (62%) | 68% | 0.65 | 7 | **0** |
+| self-improving\* | claude-haiku-5-5 | 24 (65%) | **83%** | **0.73** | **3** | **0** |
+
+\* Tuned on these same 67 cases, so its score is a fit to the benchmark, not a held-out
+estimate (two of its cases failed on model errors and count as missed).
 
 - **The verifier is a filter.** With gpt-oss it removes most of the single-call
   reviewer's false findings for about the same recall. Haiku is already far more
@@ -39,9 +43,12 @@ grades. Each cell is one run; repeated runs vary by a few bugs.
 - **Cost and speed.** With Haiku, single-call cost $0.11 for all 67 cases (median 8 s
   per PR) and find-verify $0.62 (median 10 s, 3 model calls). Cerebras does not report
   cost.
-- **Self-improving.** The improvement loop tunes find-verify's profile on this benchmark
-  (see [Improving the reviewer](#improving-the-reviewer)); because it learns from these
-  same cases, its score is a fit to the benchmark, not a held-out estimate.
+- **Self-improving.** Three rounds of the improvement loop on all 67 cases (see
+  [Improving the reviewer](#improving-the-reviewer)) kept one edit, an
+  untrusted-deserialization specialist; two reflected-XSS specialists were rejected.
+  Its gain over find-verify is mostly precision, and is about the size of the
+  run-to-run variation: the same default profile found 8 and 12 of the 21 dev bugs in
+  two separate runs. It cost $0.63 for one pass over the 67 cases.
 
 Runs live in `.bench/runs/<model>/<reviewer>/` (`results.json`, `grades.json` from Jev,
 `grades-reviewed.json` with the hand-decided findings, and `score.json`).

@@ -32,6 +32,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 import sys
 
 from .catalog import digest, load
@@ -164,10 +165,10 @@ def apply_edit(profile, edit):
                 raise ValueError(f"no specialist named {spec['name']!r}; use add_specialist")
             new["specialists"] = [spec if s["name"] == spec["name"] else s for s in new["specialists"]]
     new["version"] = profile.get("version", 0) + 1
-    path = ROOT / ".bench" / "improve" / ".validate.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_json(path, new)
-    load_profile(path)  # raises ValueError if invalid
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profile.json"
+        write_json(path, new)
+        load_profile(path)  # raises ValueError if invalid
     return new
 
 

@@ -1,0 +1,31 @@
+{
+  "name": "default",
+  "version": 2,
+  "finder_guidance": "Report concrete vulnerabilities, not hardening suggestions or missing best practices.",
+  "verifier_criteria": "Confirm only if code you cite shows all of:\n  (a) an attacker controls the input (an HTTP route or parameter, a UI field, an uploaded\n      file, data from another user), unless code shows authentication or validation\n      that blocks this attack;\n  (b) the input reaches the operation without an effective guard;\n  (c) the operation can cause the claimed impact;\n  (d) this diff introduced or weakened it (cite a changed line).\nReject if cited code contradicts one of these; quote the guard or line that does.\nAnswer uncertain if the deciding code is unavailable or still unclear.",
+  "specialists": [
+    {
+      "name": "untrusted-deserialization",
+      "focus": "Attacker-influenced bytes, or a request-selected file or name, reaching a deserializer that can instantiate objects or run code.",
+      "guidance": "Sources: request parameters, form and JSON fields, uploads, cookies, headers, tokens or assertions from external identity providers, stored user data, and names or paths that select which file gets loaded. Sinks: Python pickle/cPickle/dill/joblib.load(s), torch.load without weights_only=True, yaml.load without a safe loader; Java ObjectInputStream.readObject and deserialization inside token, state, or nonce decoders; PHP unserialize; Ruby Marshal.load and YAML.load; .NET BinaryFormatter and NetDataContractSerializer; JSON with polymorphic or default typing enabled. Defenses to check: safe loader or weights_only, class allow-lists, signature or HMAC verification before decoding, authenticated encryption, and a fixed trusted location writable only by operators. Report when the diff adds or keeps such a sink and the bytes, or the selected file, can come from a user or external party. Do not report a fixed file that only trusted operators can write. When a user-selected name is joined into a directory path, report only if it can escape the directory or allowed names are not enforced server-side.",
+      "triggers": [
+        "torch\\.load",
+        "pickle\\.loads?",
+        "cpickle",
+        "joblib\\.load",
+        "dill\\.load",
+        "yaml\\.load\\s*\\(",
+        "unserialize\\s*\\(",
+        "marshal\\.load",
+        "objectinputstream",
+        "readobject\\s*\\(",
+        "binaryformatter",
+        "netdatacontractserializer",
+        "defaulttyping",
+        "enableDefaultTyping",
+        "deserializ",
+        "unpickl"
+      ]
+    }
+  ]
+}

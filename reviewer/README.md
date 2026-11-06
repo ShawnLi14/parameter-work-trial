@@ -54,6 +54,24 @@ cap (`--max-calls 150`) and deadline (`--review-timeout 300`), and the last turn
 are told to finish. At most 10 candidates are verified; any beyond that are listed
 as `unverified`.
 
+**Profiles and specialists.** The parts of the prompts meant to be tuned live in a
+JSON profile, `reviewer/profiles/default.json` unless `--profile` names another:
+
+- `finder_guidance`: appended to the finder's prompt.
+- `verifier_criteria`: the checklist the verifier confirms against.
+- `specialists`: up to 8 extra finders, each hunting one class of vulnerability, with
+  a `name`, a one-sentence `focus`, `guidance` on sources, sinks, and missing
+  defenses, and `triggers`: regular expressions matched against the diff's changed
+  lines. A specialist runs only when a trigger matches (always, if it has none).
+
+The general finder and the matching specialists run in parallel. Candidates at the
+same location are merged; each records which hunter proposed it (`source`, and
+`also_proposed_by`). The default profile has no specialists and reproduces the
+fixed prompts above. Fixed rules (untrusted input, tool use, citations, report
+format) stay in code. `metadata.profile` records the profile's name, version, and
+SHA-256. The benchmark's improvement loop edits profiles; see the
+[root README](../README.md#improving-the-reviewer).
+
 **Output.** `findings` is benchmark-compatible. The output also keeps every
 `candidates` entry, each `verifications` verdict with its reason, citations,
 lookups, and stop reason, and the finder's lookups. `metadata.status` is `partial`

@@ -196,6 +196,53 @@ Results record the catalog's SHA-256 and grades record the results' SHA-256, so 
 label change after a run cannot be scored silently. Changing labels means a new
 catalog version and regrading.
 
+## Improving the reviewer
+
+`python -m benchmark.improve` tunes find-verify's profile (its finder guidance,
+verifier criteria, and specialists; see [reviewer/README.md](reviewer/README.md))
+from its own dev failures, in the spirit of AgentFlow's harness search.
+
+**Triage.** `benchmark/triage.py` attributes every failure to the stage that caused
+it. Each labelled bug is `found`, `not_proposed` (no hunter proposed it),
+`verifier_rejected`, `verifier_uncertain`, or `unverified` (over the candidate cap).
+Each false finding is a `verifier_confirmed_false` and records the hunter that
+proposed it. The scorer never grades rejected candidates, so triage asks Jev to match
+all candidates, not only findings, against the labels.
+
+**Each round:**
+
+1. An optimizer model (Cerebras `gpt-oss-120b`, high reasoning) sees the current
+   profile, the dev failures grouped by stage, and earlier rounds' edits. It writes
+   a diagnosis (stage, bottleneck, intended and actual behaviour) and exactly one
+   edit: set the verifier criteria, set the finder guidance, or add, update, or
+   remove a specialist. Bugs never proposed call for specialists; false findings and
+   wrongly dropped bugs call for verifier changes.
+2. The edit is rejected, and the optimizer asked again (up to three attempts), if it
+   is invalid or names any benchmark repository, file, function, or advisory id.
+   The banned terms come from every case, held-out included.
+3. The edited profile runs on the dev split and is graded by Jev.
+4. The edit is kept only if dev F1 improves **and** bugs found stays within
+   `--recall-slack` (default 3) of the starting profile. The floor is measured from
+   the start, not the last round, so recall cannot erode a little each round.
+
+```powershell
+python -m benchmark.improve --name run1 --rounds 3
+# Reuse an existing full run's dev cases as round 0 instead of re-running them:
+python -m benchmark.improve --name run1 --rounds 3 --seed-results .bench/fv-full-run.json
+# Evaluate a finished profile on the held-out split (never done inside the loop):
+python -m benchmark.improve --name run1 --evaluate-holdout .bench/improve/run1/p002.json
+```
+
+Everything is saved under `.bench/improve/NAME/`: each profile, the optimizer's
+proposal, and the dev results, grades, score, and triage per round, plus
+`state.json` with the incumbent. A stopped run resumes from its state.
+
+The optimizer never sees held-out cases, and holdout runs only on request. A dev run
+takes 10 to 20 minutes, and repeated runs of one profile vary by a few bugs, so a
+small gain in one round can be noise. No loop result is reported yet: the first runs
+rejected verifier edits that cut false findings but lost too many real bugs (one
+kept 9 of 15 dev bugs).
+
 ## How the suite was built, and how far to trust it
 
 Separate AI agents mined the commit pairs from each project's history, then other

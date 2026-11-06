@@ -35,6 +35,7 @@ def main(argv=None):
                         help="baseline: one call on the diff; find-verify: a tool-using finder, then a verifier per finding")
     parser.add_argument("--base-dir", type=Path, help="find-verify: base source tree for lookups on a local diff")
     parser.add_argument("--head-dir", type=Path, help="find-verify: head source tree for lookups on a local diff")
+    parser.add_argument("--profile", type=Path, help="find-verify: editable prompts and specialists (default: reviewer/profiles/default.json)")
     parser.add_argument("--finder-calls", type=positive_int, default=20, help="find-verify: model-call cap for the finder")
     parser.add_argument("--verifier-calls", type=positive_int, default=12, help="find-verify: model-call cap per verifier")
     parser.add_argument("--concurrency", type=positive_int, default=3, help="find-verify: parallel hunters and verifiers")
@@ -80,7 +81,8 @@ def main(argv=None):
         record = (lambda trace: write_json(args.record, trace)) if args.record else None
         if args.strategy == "find-verify":
             from .code_access import CodeAccess, pin_pr_base
-            from .find_verify import FindVerifyLimits, finder_payload, review as find_verify_review
+            from .find_verify import FindVerifyLimits, finder_payload, load_profile, review as find_verify_review
+            profile = load_profile(args.profile)
             limits = FindVerifyLimits(finder_calls=args.finder_calls, verifier_calls=args.verifier_calls,
                                       concurrency=args.concurrency, max_calls=args.max_calls,
                                       review_timeout=args.review_timeout, max_context_chars=args.max_context_chars)
@@ -88,12 +90,12 @@ def main(argv=None):
                 pin_pr_base(request, github_token)
             context = context_from_request(request, args.max_input_chars)
             if args.dry_run:
-                result = finder_payload(context, args.model, args.max_tokens, args.reasoning_effort, args.provider)
+                result = finder_payload(context, args.model, args.max_tokens, args.reasoning_effort, args.provider, profile)
             else:
                 result = find_verify_review(context, environment.get(PROVIDERS[args.provider]["key"]),
                     access=CodeAccess(request, github_token), model=args.model, max_tokens=args.max_tokens,
                     reasoning_effort=args.reasoning_effort, timeout=args.timeout, provider=args.provider,
-                    limits=limits, record=record)
+                    limits=limits, profile=profile, record=record)
         else:
             context = context_from_request(request, args.max_input_chars)
             if args.dry_run:

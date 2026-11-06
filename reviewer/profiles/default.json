@@ -1,0 +1,7 @@
+{
+  "name": "default",
+  "version": 1,
+  "finder_guidance": "Report concrete vulnerabilities, not hardening suggestions or missing best practices.",
+  "verifier_criteria": "Confirm only if code you cite shows all of:\n  (a) an attacker controls the input (an HTTP route or parameter, a UI field, an uploaded\n      file, data from another user), unless code shows authentication or validation\n      that blocks this attack;\n  (b) the input reaches the operation without an effective guard;\n  (c) the operation can cause the claimed impact;\n  (d) this diff introduced or weakened it (cite a changed line).\nReject if cited code contradicts one of these; quote the guard or line that does.\nAnswer uncertain if the deciding code is unavailable or still unclear.",
+  "specialists": []
+}

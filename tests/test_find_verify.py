@@ -6,7 +6,8 @@ from unittest.mock import patch
 
 from benchmark.runner import validate_output
 from reviewer.cli import main
-from reviewer.find_verify import FindVerifyLimits, check_candidate, finder_payload, review
+from reviewer.find_verify import (FindVerifyLimits, check_candidate, finder_payload, load_profile, profile_sha256,
+                                  review, verifier_prompt)
 from reviewer.evidence import Evidence
 from helpers import BASE_LINE, CONTEXT, DIFF, HEAD_LINE, INPUT_LINE, ROOT, FakeAccess, sent, tool_reply, tools
 from reviewer.inputs import context_from_request
@@ -138,6 +139,33 @@ class FindVerifyTests(unittest.TestCase):
         for bad in ({**CANDIDATE, "severity": "huge"}, {**CANDIDATE, "title": ""}, {**CANDIDATE, "side": "middle"}):
             with self.assertRaises(ValueError):
                 check_candidate(bad, lines)
+
+    def test_specialists_run_by_trigger_and_candidates_merge_by_location(self):
+        profile = {**load_profile(), "specialists": [
+            {"name": "injection", "focus": "Shell command injection.", "guidance": "Look for shell=True.",
+             "triggers": [r"shell\s*=\s*True"]},
+            {"name": "crypto", "focus": "Weak cryptography.", "guidance": "Look for ECB.", "triggers": ["Cipher"]}]}
+        other = {**CANDIDATE, "title": "Argument injection", "line": 4}
+        replies = [tools(report(CANDIDATE)), tools(report(CANDIDATE, other)), tools(verdict()), tools(verdict("rejected", [HEAD_LINE]))]
+        with patch("reviewer.find_verify.request_json", side_effect=replies) as client:
+            result = review(CONTEXT, "key", access=FakeAccess(), limits=FindVerifyLimits(concurrency=1), profile=profile)
+        self.assertEqual({"finder", "injection"}, set(result["hunters"]))  # crypto's trigger did not match
+        self.assertIn("specialist reviewer for one class of vulnerability: injection", sent(client, 1)["messages"][0]["content"])
+        self.assertEqual([("finder", ["injection"]), ("injection", None)],
+                         [(c["source"], c.get("also_proposed_by")) for c in result["candidates"]])
+        self.assertEqual(1, len(result["findings"]))
+        self.assertEqual(profile_sha256(profile), result["metadata"]["profile"]["sha256"])
+
+    def test_profile_edits_change_the_verifier_prompt(self):
+        profile = {**load_profile(), "verifier_criteria": "Confirm only with a quoted sink."}
+        with patch("reviewer.find_verify.request_json", side_effect=[tools(report(CANDIDATE)), tools(verdict())]) as client:
+            review(CONTEXT, "key", access=FakeAccess(), limits=FindVerifyLimits(concurrency=1), profile=profile)
+        self.assertIn("Confirm only with a quoted sink.", sent(client, 1)["messages"][0]["content"])
+
+    def test_default_profile_matches_the_original_prompts(self):
+        prompt = verifier_prompt(load_profile())
+        self.assertIn("(d) this diff introduced or weakened it (cite a changed line).", prompt)
+        self.assertEqual([], load_profile()["specialists"])
 
     def test_cli_dry_run_shows_finder_payload_without_network(self):
         stdout = io.StringIO()

@@ -9,6 +9,8 @@ become findings. Code checks every verifier citation against text that verifier 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 import json
+from pathlib import Path
+import re
 import threading
 import time
 
@@ -19,7 +21,8 @@ from .http import request_json
 from .tools import (BASE, CITATION, CITATION_RULES, LOOKUP_TOOL, RATE_LIMIT_ATTEMPTS, NoToolCall,
                     check_citations, echo, model_context, rate_limit_wait, shown, tool_calls)
 
-VERSION = "find-verify-v1"
+VERSION = "find-verify-v2"
+DEFAULT_PROFILE = Path(__file__).resolve().parent / "profiles" / "default.json"
 
 LOOKUP_HELP = """
 lookup reads, searches, or lists repository code on side base (before the PR) or head
@@ -35,24 +38,87 @@ show enough: callers, routes, where input comes from, guards, sanitizers, config
 When done, call report ALONE with every vulnerability you found, or an empty list.
 For each vulnerability give the diff line where it is introduced (an added line on head,
 or a removed protection on base), the mechanism, who controls the input, and the impact.
-Report concrete vulnerabilities, not hardening suggestions or missing best practices.
+""" + LOOKUP_HELP
+
+SPECIALIST = BASE + """
+You are a specialist reviewer for one class of vulnerability: {name}.
+{focus}
+Find only vulnerabilities of this class that this PR introduces or materially worsens;
+other reviewers cover other classes. The diff is labelled with line numbers. Use lookup
+whenever the diff alone does not show enough.
+When done, call report ALONE with every vulnerability of this class you found, or an
+empty list. For each, give the diff line where it is introduced (an added line on head,
+or a removed protection on base), the mechanism, who controls the input, and the impact.
 """ + LOOKUP_HELP
 
 VERIFIER = BASE + """
 Another reviewer reported the vulnerability below in this PR. Verify, in the code,
 whether it is a real problem introduced by this PR. Use lookup to read the code involved.
 
-Confirm only if code you cite shows all of:
-  (a) an attacker controls the input (an HTTP route or parameter, a UI field, an uploaded
-      file, data from another user), unless code shows authentication or validation
-      that blocks this attack;
-  (b) the input reaches the operation without an effective guard;
-  (c) the operation can cause the claimed impact;
-  (d) this diff introduced or weakened it (cite a changed line).
-Reject if cited code contradicts one of these; quote the guard or line that does.
-Answer uncertain if the deciding code is unavailable or still unclear.
+{criteria}
 Stop as soon as you can decide, and call verdict ALONE.
 """ + LOOKUP_HELP + CITATION_RULES
+
+_NAME = re.compile(r"[a-z0-9][a-z0-9-]{1,40}")
+
+
+def load_profile(path=None):
+    """Read and validate an editable profile: finder guidance, verifier criteria, specialists."""
+    profile = json.loads(Path(path or DEFAULT_PROFILE).read_text(encoding="utf-8"))
+    if not isinstance(profile, dict):
+        raise ValueError("profile must be a JSON object")
+    for key in ("finder_guidance", "verifier_criteria"):
+        if not isinstance(profile.get(key), str) or len(profile[key]) > 4000:
+            raise ValueError(f"profile {key} must be a string of at most 4000 characters")
+    if not profile["verifier_criteria"].strip():
+        raise ValueError("profile verifier_criteria must not be empty")
+    specialists = profile.get("specialists", [])
+    if not isinstance(specialists, list) or len(specialists) > 8:
+        raise ValueError("profile specialists must be a list of at most 8")
+    names = set()
+    for s in specialists:
+        if not isinstance(s, dict) or not isinstance(s.get("name"), str) or not _NAME.fullmatch(s["name"]):
+            raise ValueError("each specialist needs a lowercase name (letters, digits, hyphens)")
+        if s["name"] in names or s["name"] == "finder":
+            raise ValueError(f"duplicate or reserved specialist name {s['name']!r}")
+        names.add(s["name"])
+        for key in ("focus", "guidance"):
+            if not isinstance(s.get(key), str) or not s[key].strip() or len(s[key]) > 2000:
+                raise ValueError(f"specialist {s['name']}: {key} must be non-empty, at most 2000 characters")
+        triggers = s.get("triggers", [])
+        if not isinstance(triggers, list) or len(triggers) > 20 or not all(isinstance(t, str) and t for t in triggers):
+            raise ValueError(f"specialist {s['name']}: triggers must be a list of regular expressions")
+        for t in triggers:
+            try:
+                re.compile(t)
+            except re.error as error:
+                raise ValueError(f"specialist {s['name']}: invalid trigger {t!r}: {error}") from None
+    return profile
+
+
+def profile_sha256(profile):
+    return sha256(json.dumps(profile, sort_keys=True))
+
+
+def changed_text(diff):
+    return "\n".join(line[1:] for line in diff.splitlines()
+                     if line[:1] in "+-" and not line.startswith(("+++", "---")))
+
+
+def hunters(profile, diff):
+    """(name, system prompt) for the general finder and every specialist whose triggers match."""
+    text = changed_text(diff)
+    result = [("finder", FINDER + "\n" + profile["finder_guidance"])]
+    for s in profile.get("specialists", []):
+        # A specialist without triggers always runs; otherwise only when the change matches.
+        if not s.get("triggers") or any(re.search(t, text, re.IGNORECASE | re.MULTILINE) for t in s["triggers"]):
+            prompt = SPECIALIST.replace("{name}", s["name"]).replace("{focus}", s["focus"])
+            result.append((s["name"], prompt + "\n" + s["guidance"]))
+    return result
+
+
+def verifier_prompt(profile):
+    return VERIFIER.replace("{criteria}", profile["verifier_criteria"])
 
 _SIDE = {"type": "string", "enum": ["base", "head"]}
 REPORT_TOOL = {"type": "function", "function": {
@@ -79,6 +145,7 @@ VERIFIER_TOOLS = [LOOKUP_TOOL, VERDICT_TOOL]
 @dataclass(frozen=True)
 class FindVerifyLimits:
     finder_calls: int = 20
+    specialist_calls: int = 14
     verifier_calls: int = 12
     max_candidates: int = 10
     concurrency: int = 3
@@ -92,15 +159,17 @@ class FindVerifyLimits:
                 raise ValueError(f"Invalid limit: {key}")
 
 
-def finder_messages(context):
-    return [{"role": "system", "content": FINDER},
+def finder_messages(context, system):
+    return [{"role": "system", "content": system},
             {"role": "user", "content": json.dumps(model_context(context), ensure_ascii=False)}]
 
 
-def finder_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effort="medium", provider="openrouter"):
+def finder_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effort="medium", provider="openrouter",
+                   profile=None):
+    profile = profile or load_profile()
     payload = build_payload(context, model, max_tokens, reasoning_effort, provider)
-    return {**payload, "messages": finder_messages(context), "tools": FINDER_TOOLS,
-            "tool_choice": "required", "parallel_tool_calls": True}
+    return {**payload, "messages": finder_messages(context, hunters(profile, context["diff"])[0][1]),
+            "tools": FINDER_TOOLS, "tool_choice": "required", "parallel_tool_calls": True}
 
 
 def check_candidate(item, diff_lines):
@@ -120,8 +189,9 @@ def check_candidate(item, diff_lines):
 
 
 def review(context, api_key, *, access, model=DEFAULT_MODEL, max_tokens=16384,
-           reasoning_effort="medium", timeout=240, record=None, provider="openrouter", limits=None):
+           reasoning_effort="medium", timeout=240, record=None, provider="openrouter", limits=None, profile=None):
     limits = limits or FindVerifyLimits()
+    profile = profile or load_profile()
     if not api_key or not api_key.strip():
         raise ValueError(f"Set {PROVIDERS[provider]['key']} before running a live review")
     started = time.monotonic()
@@ -253,10 +323,27 @@ def review(context, api_key, *, access, model=DEFAULT_MODEL, max_tokens=16384,
                 problems.append(f"finding {i}: {error}")
         return accepted, problems
 
-    finder = loop("finder", finder_messages(context), FINDER_TOOLS, "report", accept_report,
-                  limits.finder_calls, Evidence(context["diff"]))
-    # A report still invalid at the last call keeps its valid candidates.
-    candidates = finder["value"] or []
+    def hunt(hunter):
+        name, system = hunter
+        calls = limits.finder_calls if name == "finder" else limits.specialist_calls
+        return name, loop(f"find-{name}", finder_messages(context, system), FINDER_TOOLS, "report", accept_report,
+                          calls, Evidence(context["diff"]))
+
+    with ThreadPoolExecutor(max_workers=limits.concurrency) as pool:
+        hunts = dict(pool.map(hunt, hunters(profile, context["diff"])))
+    finder = hunts["finder"]
+    # A report still invalid at the last call keeps its valid candidates. Candidates at the
+    # same location are merged; the first hunter in order (finder first) keeps the text.
+    candidates, at = [], {}
+    for name, run in hunts.items():
+        for item in run["value"] or []:
+            key = (item["side"], item["path"], item["line"])
+            if key in at:
+                at[key].setdefault("also_proposed_by", []).append(name)
+                continue
+            item["source"] = name
+            at[key] = item
+            candidates.append(item)
     for i, item in enumerate(candidates, 1):
         item["id"] = f"c{i:02}"
     to_verify, unverified = candidates[:limits.max_candidates], candidates[limits.max_candidates:]
@@ -282,7 +369,7 @@ def review(context, api_key, *, access, model=DEFAULT_MODEL, max_tokens=16384,
             return {"verdict": verdict, "reason": reason, "evidence": evidence}, problems
 
         task = {k: candidate[k] for k in ("title", "severity", "description", "path", "line", "side")}
-        messages = [{"role": "system", "content": VERIFIER},
+        messages = [{"role": "system", "content": verifier_prompt(profile)},
                     {"role": "user", "content": json.dumps({**model_context(context), "reported_vulnerability": task},
                                                            ensure_ascii=False)}]
         run = loop(f"verify-{candidate['id']}", messages, VERIFIER_TOOLS, "verdict", accept_verdict,
@@ -311,16 +398,21 @@ def review(context, api_key, *, access, model=DEFAULT_MODEL, max_tokens=16384,
     reported_cost = bool(costs) and all(isinstance(c, (int, float)) for c in costs) and len(usages) == len(trace["calls"])
     if finder["stop_reason"] == "error" or any(v["stop_reason"] == "error" for v in verifications):
         status = "error"
-    elif finder["stop_reason"] != "report" or unverified or any(v["verdict"] == "uncertain" for v in verifications):
+    elif (any(h["stop_reason"] != "report" for h in hunts.values()) or unverified
+          or any(v["verdict"] == "uncertain" for v in verifications)):
         status = "partial"
     else:
         status = "completed"
     result = {"findings": findings, "candidates": candidates, "verifications": verifications,
               "finder": {k: finder.get(k) for k in ("stop_reason", "error", "rejections", "model_calls")}
                         | {"lookups": finder["lookups"]},
+              "hunters": {name: {k: run.get(k) for k in ("stop_reason", "error", "model_calls")}
+                          | {"lookups": len(run["lookups"]), "candidates": len(run["value"] or [])}
+                          for name, run in hunts.items()},
               "unverified": unverified, "metadata": {
         "status": status, "scope": "find_then_verify", "prompt_version": VERSION,
-        "prompt_sha256": sha256(FINDER + VERIFIER + json.dumps([FINDER_TOOLS, VERIFIER_TOOLS], sort_keys=True)),
+        "profile": {"name": profile.get("name"), "version": profile.get("version"), "sha256": profile_sha256(profile)},
+        "prompt_sha256": sha256(FINDER + SPECIALIST + VERIFIER + json.dumps([FINDER_TOOLS, VERIFIER_TOOLS], sort_keys=True)),
         "context_sha256": sha256(json.dumps(context, sort_keys=True)),
         "requested_model": model, "provider": provider, "model_calls": len(trace["calls"]), "usage": usage,
         "cost_usd": sum(costs) if reported_cost else 0.0 if model.endswith(":free") else None,

@@ -188,15 +188,16 @@ def summarize(scored):
     return {k: scored.get(k) for k in keys}
 
 
-def evaluate(profile_path, out_dir, data, split="dev", label="eval"):
+def evaluate(profile_path, out_dir, data, split="dev", label="eval", provider="cerebras", model="gpt-oss-120b"):
     """Run, grade, score, and triage one profile. Returns the summary dict."""
     out_dir.mkdir(parents=True, exist_ok=True)
     results_path = out_dir / f"{label}-results.json"
     if not results_path.exists():
         command = [sys.executable, "-m", "benchmark", "run", "--split", split,
-                   "--model", f"cerebras/gpt-oss-120b/find-verify/{Path(profile_path).stem}", "--timeout", "420",
+                   "--model", f"{provider}/{model}/find-verify/{Path(profile_path).stem}", "--timeout", "420",
                    "--out", str(results_path), "--", sys.executable, str(ROOT / "reviewer"),
-                   "--provider", "cerebras", "--strategy", "find-verify", "--profile", str(Path(profile_path).resolve())]
+                   "--provider", provider, "--model", model, "--strategy", "find-verify",
+                   "--profile", str(Path(profile_path).resolve())]
         print(f"  running {split} for {Path(profile_path).name} ...", flush=True)
         subprocess.run(command, cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
     return grade_and_triage(read_json(results_path), out_dir, data, label)
@@ -262,14 +263,13 @@ def parse_object(response):
     return value
 
 
-def propose(profile, report, history, banned, attempts=3):
+def propose(profile, report, history, banned, attempts=3, provider="cerebras", model="gpt-oss-120b"):
+    from reviewer.baseline import PROVIDERS, send
     from reviewer.config import load_environment
-    from reviewer.http import request_json
-    key = load_environment().get("CEREBRAS_API_KEY")
+    key = load_environment().get(PROVIDERS[provider]["key"])
     if not key:
-        raise ValueError("Set CEREBRAS_API_KEY for the optimizer")
-    payload = {"model": "gpt-oss-120b", "temperature": 0.3, "max_completion_tokens": 16384,
-               "reasoning_effort": "high", "stream": False, "messages": [
+        raise ValueError(f"Set {PROVIDERS[provider]['key']} for the optimizer")
+    payload = {"model": model, "max_completion_tokens": 16384, "reasoning_effort": "high", "stream": False, "messages": [
                    {"role": "system", "content": OPTIMIZER},
                    {"role": "user", "content": json.dumps({
                        "profile": profile, "dev_failures": failures_for_optimizer(report),
@@ -279,8 +279,9 @@ def propose(profile, report, history, banned, attempts=3):
         if problems:
             payload["messages"].append({"role": "user", "content": "Your edit was rejected: " + "; ".join(problems)
                                         + ". Return a corrected JSON object."})
-        response = request_json("https://api.cerebras.ai/v1/chat/completions", payload=payload, timeout=300,
-                                headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+        if provider != "anthropic":
+            payload["temperature"] = 0.3  # some variety between attempts; Claude rejects sampling parameters
+        response = send(provider, payload, key, 300)
         try:
             value = parse_object(response)
             found = leaks(edit_text(value.get("edit")), banned)
@@ -322,7 +323,7 @@ def run_loop(args):
             dev = {c["id"] for c in data["cases"] if c["split"] == "dev"}
             (home / "p000").mkdir(parents=True, exist_ok=True)
             write_json(home / "p000" / "dev-results.json", subset(read_json(args.seed_results), dev))
-        summary, _ = evaluate(home / "p000.json", home / "p000", data, label="dev")
+        summary, _ = evaluate(home / "p000.json", home / "p000", data, label="dev", provider=args.provider, model=args.model)
         state["incumbent_summary"] = state["start_summary"] = summary
         write_json(state_path, state)
     print(f"incumbent {state['incumbent']}: {state['incumbent_summary']}")
@@ -334,7 +335,8 @@ def run_loop(args):
                     "objective": r.get("summary", {}).get("objective")} for r in state["rounds"]]
         print(f"round {number}: proposing an edit ...", flush=True)
         try:
-            proposal, profile = propose(incumbent, report, history, banned)
+            proposal, profile = propose(incumbent, report, history, banned, provider=args.provider,
+                                        model=args.optimizer_model or args.model)
         except ValueError as error:
             state["rounds"].append({"round": number, "accepted": False, "error": str(error)})
             write_json(state_path, state)
@@ -344,7 +346,7 @@ def run_loop(args):
         write_json(home / name, profile)
         write_json(home / f"p{number:03}-proposal.json", proposal)
         print(f"  edit: {describe(proposal['edit'])}")
-        summary, _ = evaluate(home / name, home / f"p{number:03}", data, label="dev")
+        summary, _ = evaluate(home / name, home / f"p{number:03}", data, label="dev", provider=args.provider, model=args.model)
         accepted = keep(summary, state["incumbent_summary"], state["start_summary"], args.recall_slack)
         state["rounds"].append({"round": number, "profile": name, "edit_summary": describe(proposal["edit"]),
                                 "summary": summary, "accepted": accepted,
@@ -371,12 +373,18 @@ def main(argv=None):
                         help="bugs found may fall at most this far below the starting profile")
     parser.add_argument("--seed-results", help="existing results of the starting profile (dev cases are reused)")
     parser.add_argument("--evaluate-holdout", help="evaluate this profile on the holdout split and stop")
+    parser.add_argument("--provider", default="cerebras", choices=["cerebras", "openrouter", "anthropic"],
+                        help="provider for the reviewer runs and the optimizer")
+    parser.add_argument("--model", help="reviewer model (default: the provider's default)")
+    parser.add_argument("--optimizer-model", help="optimizer model (default: the reviewer model)")
     args = parser.parse_args(argv)
+    from reviewer.baseline import PROVIDERS
+    args.model = args.model or PROVIDERS[args.provider]["model"]
     if args.evaluate_holdout:
         data = load(SUITE)
         target = Path(args.evaluate_holdout)
         summary, _ = evaluate(target, ROOT / ".bench" / "improve" / args.name / f"holdout-{target.stem}",
-                              data, split="holdout", label="holdout")
+                              data, split="holdout", label="holdout", provider=args.provider, model=args.model)
         print(json.dumps(summary, indent=1))
         return 0
     run_loop(args)

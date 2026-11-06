@@ -14,10 +14,9 @@ import re
 import threading
 import time
 
-from .baseline import DEFAULT_MODEL, PROVIDERS, build_payload, sha256, validate_findings
+from .baseline import DEFAULT_MODEL, PROVIDERS, build_payload, send, sha256, validate_findings
 from .code_access import validate_action
 from .evidence import Evidence
-from .http import request_json
 from .tools import (BASE, CITATION, CITATION_RULES, LOOKUP_TOOL, RATE_LIMIT_ATTEMPTS, NoToolCall,
                     check_citations, echo, model_context, rate_limit_wait, shown, tool_calls)
 
@@ -224,9 +223,7 @@ def review(context, api_key, *, access, model=DEFAULT_MODEL, max_tokens=16384,
         try:
             for attempt in range(RATE_LIMIT_ATTEMPTS):
                 try:
-                    response = request_json(PROVIDERS[provider]["url"] + "/chat/completions", payload=payload,
-                                            headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
-                                            timeout=max(0.01, min(timeout, deadline-time.monotonic())))
+                    response = send(provider, payload, api_key, max(0.01, min(timeout, deadline-time.monotonic())))
                     break
                 except ValueError as error:
                     # Only HTTP 429 (refused unprocessed) is resent, and never past the deadline.

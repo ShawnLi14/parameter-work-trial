@@ -11,12 +11,24 @@ from .prompt import PROMPT_VERSION, SYSTEM_PROMPT
 
 DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 BASE_URL = "https://openrouter.ai/api/v1"
-# Both providers speak the OpenAI chat-completions format; they differ in endpoint,
-# key, default model, and how reasoning effort and output length are requested.
+# OpenRouter and Cerebras speak the OpenAI chat-completions format; they differ in
+# endpoint, key, default model, and how reasoning effort and output length are requested.
+# Anthropic requests are built in the same shape and converted by reviewer/claude.py.
 PROVIDERS = {
     "openrouter": {"url": BASE_URL, "key": "OPENROUTER_API_KEY", "model": DEFAULT_MODEL},
     "cerebras": {"url": "https://api.cerebras.ai/v1", "key": "CEREBRAS_API_KEY", "model": "gpt-oss-120b"},
+    "anthropic": {"url": "https://api.anthropic.com/v1", "key": "ANTHROPIC_API_KEY", "model": "claude-haiku-5-5"},
 }
+
+
+def send(provider, payload, api_key, timeout, headers=None):
+    """One model request in chat-completions shape, to whichever provider is selected."""
+    if provider == "anthropic":
+        from .claude import complete
+        return complete(payload, api_key, timeout)
+    return request_json(PROVIDERS[provider]["url"] + "/chat/completions", payload=payload, timeout=timeout,
+                        headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json",
+                                 **(headers or {})})
 
 
 def sha256(value):
@@ -28,6 +40,10 @@ def build_payload(context, model=DEFAULT_MODEL, max_tokens=16384, reasoning_effo
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": json.dumps(context, ensure_ascii=False, sort_keys=True)},
     ]
+    if provider == "anthropic":
+        # Current Claude models reject sampling parameters; effort controls thinking.
+        return {"model": model, "messages": messages, "max_completion_tokens": max_tokens,
+                "reasoning_effort": "low" if reasoning_effort == "none" else reasoning_effort, "stream": False}
     if provider == "cerebras":
         # gpt-oss always reasons; "low" is the closest setting to none.
         return {"model": model, "messages": messages, "temperature": 0,
@@ -115,11 +131,8 @@ def review(context, api_key, *, model=DEFAULT_MODEL, max_tokens=16384,
         record(trace)
     start = time.monotonic()
     try:
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        if provider == "openrouter":
-            headers["X-OpenRouter-Title"] = "Security PR Review Baseline"
-        response = request_json(settings["url"] + "/chat/completions", payload=payload, timeout=timeout,
-                                headers=headers)
+        headers = {"X-OpenRouter-Title": "Security PR Review Baseline"} if provider == "openrouter" else None
+        response = send(provider, payload, api_key, timeout, headers)
         trace["response"] = response
         if record:
             record(trace)

@@ -31,7 +31,7 @@ def lookup(path="routes.py", start=1):
 
 
 def run(replies, access=None, **limits):
-    with patch("reviewer.find_verify.request_json", side_effect=replies) as client:
+    with patch("reviewer.baseline.request_json", side_effect=replies) as client:
         result = review(CONTEXT, "key", access=access or FakeAccess(), limits=FindVerifyLimits(concurrency=1, **limits))
     return result, client
 
@@ -147,7 +147,7 @@ class FindVerifyTests(unittest.TestCase):
             {"name": "crypto", "focus": "Weak cryptography.", "guidance": "Look for ECB.", "triggers": ["Cipher"]}]}
         other = {**CANDIDATE, "title": "Argument injection", "line": 4}
         replies = [tools(report(CANDIDATE)), tools(report(CANDIDATE, other)), tools(verdict()), tools(verdict("rejected", [HEAD_LINE]))]
-        with patch("reviewer.find_verify.request_json", side_effect=replies) as client:
+        with patch("reviewer.baseline.request_json", side_effect=replies) as client:
             result = review(CONTEXT, "key", access=FakeAccess(), limits=FindVerifyLimits(concurrency=1), profile=profile)
         self.assertEqual({"finder", "injection"}, set(result["hunters"]))  # crypto's trigger did not match
         self.assertIn("specialist reviewer for one class of vulnerability: injection", sent(client, 1)["messages"][0]["content"])
@@ -158,7 +158,7 @@ class FindVerifyTests(unittest.TestCase):
 
     def test_profile_edits_change_the_verifier_prompt(self):
         profile = {**load_profile(), "verifier_criteria": "Confirm only with a quoted sink."}
-        with patch("reviewer.find_verify.request_json", side_effect=[tools(report(CANDIDATE)), tools(verdict())]) as client:
+        with patch("reviewer.baseline.request_json", side_effect=[tools(report(CANDIDATE)), tools(verdict())]) as client:
             review(CONTEXT, "key", access=FakeAccess(), limits=FindVerifyLimits(concurrency=1), profile=profile)
         self.assertIn("Confirm only with a quoted sink.", sent(client, 1)["messages"][0]["content"])
 
@@ -169,7 +169,7 @@ class FindVerifyTests(unittest.TestCase):
 
     def test_cli_dry_run_shows_finder_payload_without_network(self):
         stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout), patch("reviewer.find_verify.request_json") as network:
+        with contextlib.redirect_stdout(stdout), patch("reviewer.baseline.request_json") as network:
             code = main(["--diff", str(ROOT / "reviewer/example.diff"), "--strategy", "find-verify", "--dry-run"])
         self.assertEqual(0, code)
         payload = json.loads(stdout.getvalue())
